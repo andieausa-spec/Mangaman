@@ -2,6 +2,8 @@
 
 ![Oberflaeche](Oberflaeche.png)
 
+![Rhythmus 1980](Rhythmus-1980.png)
+
 **Oszillator** mit 7 digitalen Modi, jeder gesteuert über *Wave*, *Timbre* und *Shape*:
 
 | Modus | Wave | Timbre | Shape |
@@ -25,7 +27,17 @@ und ein **Step-Sequenzer** nach Art von Doepfer SEQ / Dark Time: 16 Schritte, ob
 Richtung Vor/Rück/Pendel/Zufall, Länge, Gate, Swing, Glätten (Slew), Grundton. Läuft der Sequenzer,
 transponieren gespielte Tasten die Folge; mit „Aufnahme“ schreibt jede Taste ihren Ton in den nächsten Schritt.
 
-**Oberfläche**: ohne Scrollen, Seiten über große Taster (Klang, Formen, Modulation, Sequenzer), Fenster frei
+**Rhythmus**: zehn Drumcomputer im Stil von 808, 909, 606, 707, CR-78, LinnDrum, DMX, Drumulator, SDS-V und Mini Pops,
+alle Klänge synthetisch nachgebaut (keine Samples). 12 Spuren × 16 Schritte (tippen = an/aus, nach oben ziehen = Akzent,
+weiter = Wirbel). Der Regler *Zufall* blättert durch 100 stiltypische Muster des Modells oder eines von 20 Stilen
+(House, Techno, Electro, Hip-Hop, Funk, Bossa Nova …), *Dichte* dünnt aus oder füllt auf, *Variation* streut Geisternoten,
+*Fill* baut alle 4/8/16 Takte einen Übergang mit Becken. Dazu Shuffle, Humanize, Akzent, Länge, Raster (1/8, 1/16, 1/32)
+und je Spur Pegel, Stimmung, Ausklang, Panorama, Stumm. **Beat aus Text**: „lässiger 808 Hip-Hop mit Shuffle“,
+„bum tschak bum bum tschak“ oder Zeilen wie `bd: x...x...x...x...`. Drums, Sequenzer und Arpeggiator laufen auf demselben
+Takt (im Host auf der Song-Position); „Seq koppeln“ startet beide zusammen. MIDI-Kanal 10 spielt die Drums (General MIDI).
+Ohne Host gilt der Regler *Tempo*.
+
+**Oberfläche**: ohne Scrollen, Seiten über große Taster (Klang, Formen, Modulation, Sequenzer, Rhythmus), Fenster frei
 skalierbar. Zwei Designs zum Umschalten (wird mit dem Projekt gespeichert):
 **1980** – dunkles Plastik mit Schiebereglern, aufgedruckten Skalen und Titelschildern;
 **2100** – hell und minimal mit großen Gummipotis, die beim Anfassen nachgeben, und blauer Leuchtschrift.

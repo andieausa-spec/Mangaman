@@ -2,6 +2,7 @@
 
 #include "SynthEngine.h"
 #include "Arpeggiator.h"
+#include "DrumMachine.h"
 
 class MangamanProcessor : public juce::AudioProcessor,
                           private juce::Timer
@@ -43,19 +44,49 @@ public:
     // Übernimmt per Tastatur aufgenommene Schritte in die Parameter (Message-Thread)
     void applyRecordedSteps();
 
+    // Rhythmus: Muster (Message-Thread schreibt, Audio-Thread liest), gerade spielender Schritt, Vorhören
+    int getDrumStep() const { return drums.playingStep.load(); }
+    juce::uint32 getDrumHits() const { return drums.playingHits.load(); }
+    Rhythm::Pattern getPattern() const;
+    void setPattern (const Rhythm::Pattern&);
+    void setStep (int track, int step, int value);
+    int getPatternVersion() const { return patternVersion.load(); }
+    void audition (int track, float velocity) { auditionVel.store (velocity); auditionTrack.store (track); }
+
+    // Muster neu würfeln aus Modell, Stil, Zufall und Dichte
+    void regeneratePattern();
+    // Beat aus Text: setzt Modell, Stil, Regler und Muster, startet die Drums; liefert, was erkannt wurde
+    juce::StringArray applyRhythmText (const juce::String& text);
+    juce::String getRhythmText() const { return rhythmText; }
+    juce::String getRhythmTag() const;
+
     // Design der Oberfläche: 0 = 1980 (Schieberegler), 1 = 2100 (Gummipotis); wird mit dem Projekt gespeichert
     std::atomic<int> design { 1 };
 
 private:
     double getHostBpm() const;
-    bool hostJustStarted();
-    void timerCallback() override { applyRecordedSteps(); }
+    void timerCallback() override;
+    void setParam (const juce::String& id, float value);
+    float param (const juce::String& id) const { return apvts.getRawParameterValue (id)->load(); }
+    void rememberGenerator();
 
     Params::Reader params { apvts };
     Params::SeqReader seqParams { apvts };
+    Params::RhythmReader rhythmParams { apvts };
+    DrumMachine drums;
+    std::array<std::atomic<juce::uint8>, Drums::numTracks * Drums::numSteps> pattern {};
+    std::atomic<int> patternVersion { 0 }, auditionTrack { -1 };
+    std::atomic<float> auditionVel { 0.8f };
+    juce::AudioBuffer<float> drumBuffer;
+    double sampleRateHz = 44100.0, internalPpq = 0.0;
+    bool clockWasRunning = false;
+    juce::String rhythmText;
+    // zuletzt gewürfelt mit (Stil, Zufall, Dichte); ändert sich einer davon, entsteht ein neues Muster
+    std::atomic<float> genStyle { 0 }, genRand { 0 }, genDens { 0.5f };
+    bool lastSeqRun = false, lastDrumRun = false;
+    static constexpr float drumMix = 0.6f;   // Bassdrum etwa doppelt so laut wie eine Synth-Note (wie im Web)
     StepSequencer sequencer;
     SynthEngine engine;
-    bool hostWasPlaying = false;
     Arpeggiator arp;
 
     std::atomic<float>* gainParam   = apvts.getRawParameterValue ("master_gain");
