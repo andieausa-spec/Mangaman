@@ -1,0 +1,21 @@
+Mangaman – Installation auf dem Mac
+===================================
+
+1. Doppelklick auf „Mangaman Installer.pkg“.
+
+   Meldet macOS „kann nicht geöffnet werden, da der Entwickler nicht verifiziert ist“:
+   Systemeinstellungen → Datenschutz & Sicherheit → ganz nach unten scrollen →
+   bei „Mangaman Installer.pkg wurde blockiert“ auf „Trotzdem öffnen“ klicken.
+   (Der Installer ist nicht mit einer Apple-Developer-ID signiert.)
+
+2. Der Installer legt ab:
+   - AU-Plugin:    /Library/Audio/Plug-Ins/Components/Mangaman.component  (Logic, GarageBand)
+   - VST3-Plugin:  /Library/Audio/Plug-Ins/VST3/Mangaman.vst3             (Ableton Live, Cubase, Bitwig …)
+   - Standalone:   /Programme/Mangaman.app
+
+3. DAW neu starten.
+   Logic: Instrument → AU-Instrumente → Andi → Mangaman.
+   Falls es fehlt: Logic → Einstellungen → Plug-in-Manager → „Zurücksetzen & Neu scannen“.
+   Ableton Live: Einstellungen → Plug-ins → „VST3-Plug-in-Systemordner verwenden“ an → „Neu scannen“.
+
+Läuft auf macOS 11 oder neuer, Apple Silicon und Intel.
