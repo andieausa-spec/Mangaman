@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Parameters.h"
+#include "Clock.h"
 
 // Step-Sequenzer nach Art von Doepfer SEQ / Dark Time:
 // 16 Schritte, oberste Reihe spielt die Tonhöhe, die Reihen A bis C sind Quellen in der Mod-Matrix.
@@ -19,8 +20,8 @@ public:
         playingStep.store (-1);
     }
 
-    // Ersetzt bzw. ergänzt die MIDI-Noten des Blocks. hostStarted: Transport des Hosts ist gerade angelaufen.
-    void process (juce::MidiBuffer& midi, int numSamples, const Params::SeqSnapshot& s, double bpm, bool hostStarted)
+    // Ersetzt bzw. ergänzt die MIDI-Noten des Blocks; die Schritte liegen auf dem gemeinsamen Takt
+    void process (juce::MidiBuffer& midi, int numSamples, const Params::SeqSnapshot& s, const Clock::Block& blk)
     {
         settings = s;
         numEvents = 0;
@@ -50,11 +51,13 @@ public:
             return;
         }
 
-        if (! wasRunning || hostStarted)
+        if (! wasRunning)
             restart();
         wasRunning = true;
 
-        beatLength = sampleRate * 60.0 / bpm * Params::arpBeats[juce::jlimit (0, 5, s.rate)];
+        block = blk;
+        stepBeats = Params::arpBeats[juce::jlimit (0, 5, s.rate)];
+        follower.begin (blk, stepBeats, s.swing);
 
         juce::MidiBuffer result;
         int at = 0;
@@ -134,9 +137,8 @@ private:
     {
         pos = -1;
         stepAtStart = -1;
-        clock = 0.0;
-        offIn = -1.0;
-        count = 0;
+        follower.joined = false;
+        offAt = -1.0;
         direction = 1;
         transpose = 0;
     }
@@ -180,29 +182,23 @@ private:
 
     void advance (juce::MidiBuffer& result, int from, int to)
     {
+        const double sw = settings.swing;
         double t = from;
         while (true)
         {
-            const double stepAt = t + juce::jmax (0.0, clock);
-            const double offAt  = currentNote >= 0 && offIn >= 0.0 ? t + offIn : 1.0e12;
-            const double next   = juce::jmin (stepAt, offAt);
+            const double stepAt = juce::jmax (t, follower.nextSample (block, stepBeats, sw));
+            const double offSample = currentNote >= 0 && offAt >= 0.0 ? juce::jmax (t, block.sampleAt (offAt)) : 1.0e12;
+            const double next = juce::jmin (stepAt, offSample);
             if (next >= to)
-            {
-                clock -= to - t;
-                if (offIn >= 0.0) offIn -= to - t;
                 return;
-            }
-
-            clock -= next - t;
-            if (offIn >= 0.0) offIn -= next - t;
             t = next;
             const int sample = (int) t;
 
-            if (offAt <= stepAt)
+            if (offSample <= stepAt)
             {
                 result.addEvent (juce::MidiMessage::noteOff (1, currentNote), sample);
                 currentNote = -1;
-                offIn = -1.0;
+                offAt = -1.0;
                 continue;
             }
 
@@ -211,11 +207,10 @@ private:
                 result.addEvent (juce::MidiMessage::noteOff (1, currentNote), sample);
             currentNote = -1;
 
-            pos = nextStep();
-            const double dur = beatLength * (count % 2 == 0 ? 1.0 + settings.swing : 1.0 - settings.swing);
-            ++count;
-            clock += dur;
-            offIn = settings.gate < 0.99f ? dur * settings.gate : -1.0;
+            const long long k = ++follower.k;
+            const int len = juce::jmax (1, settings.length);
+            pos = settings.dir == 0 ? (int) (((k % len) + len) % len) : nextStep();
+            offAt = settings.gate < 0.99f ? Clock::start (k, stepBeats, sw) + Clock::duration (k, stepBeats, sw) * settings.gate : -1.0;
 
             if (settings.on[pos])
             {
@@ -235,8 +230,10 @@ private:
     int numEvents = 0, stepAtStart = -1;
 
     Params::SeqSnapshot settings;
-    double sampleRate = 44100.0, beatLength = 10000.0, clock = 0.0, offIn = -1.0;
-    int pos = -1, count = 0, direction = 1, transpose = 0, currentNote = -1, recordStep = 0;
+    double sampleRate = 44100.0, stepBeats = 0.25, offAt = -1.0;
+    Clock::Block block;
+    Clock::Follower follower;
+    int pos = -1, direction = 1, transpose = 0, currentNote = -1, recordStep = 0;
     bool wasRunning = false, wasRecording = false;
     std::array<bool, 128> transposeKeys {};
     float out[Params::seqRows] {};

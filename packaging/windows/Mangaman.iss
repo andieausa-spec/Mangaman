@@ -1,8 +1,8 @@
 ; Inno-Setup-Skript für Mangaman (VST3 + Standalone, 64 Bit)
-; Aufruf: iscc /DAppVersion=0.1.0 /DBuildDir=<...>\build\Mangaman_artefacts\Release /O<ausgabe> Mangaman.iss
+; Aufruf: iscc /DAppVersion=0.2.0 /DBuildDir=<...>\build\Mangaman_artefacts\Release /O<ausgabe> Mangaman.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.2.0"
 #endif
 #ifndef BuildDir
   #define BuildDir "..\..\build\Mangaman_artefacts\Release"

@@ -45,6 +45,16 @@ namespace Params
         static const char* names[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H" };
         return juce::String (names[((n % 12) + 12) % 12]) + juce::String (n / 12 - 1);
     }
+    // Rhythmus
+    inline const juce::StringArray rhythmKits { "808-Stil", "909-Stil", "606-Stil", "707-Stil", "CR-78-Stil", "LinnDrum-Stil",
+                                                "DMX-Stil", "Drumulator-Stil", "SDS-V-Stil", "Mini-Pops-Stil" };
+    inline const juce::StringArray rhythmStyles { "Passend zum Modell", "House", "Techno", "Trance", "Garage", "Acid", "Electro",
+                                                  "Minimal", "Hip-Hop", "Trap", "Breakbeat", "Drum & Bass", "Italo", "Disco", "Funk",
+                                                  "Pop 80er", "Rock", "Bossa Nova", "Samba", "Rumba", "Reggae" };
+    constexpr int rhythmTracks = 12;
+    inline const char* rhythmTrackShort[] { "BD", "SD", "CP", "RS", "CH", "OH", "LT", "MT", "HT", "CB", "CY", "PC" };
+    inline juce::String rhId (const char* what, int t) { return juce::String ("rh_") + what + "_" + juce::String (t); }
+
     enum Dest { DPitch, DWave, DTimbre, DShape, DCutoff, DReso, DAmp };
 
     inline juce::String modId (int s, int d) { return "mod_" + juce::String (s) + "_" + juce::String (d); }
@@ -185,6 +195,40 @@ namespace Params
             bipolar (seqRowId (2, i), "Seq Reihe C " + n, 0.0f);
         }
 
+        // Rhythmus: Drumcomputer
+        toggle ("rh_run",  "Drums Start", false);
+        toggle ("rh_link", "Drums mit Sequenzer koppeln", false);
+        choice ("rh_kit",  "Drumcomputer", rhythmKits, 1);
+        choice ("rh_style", "Drums Stil", rhythmStyles, 0);
+        flt ("rh_rand", "Drums Zufall", { 0.0f, 0.99f, 0.01f }, 0.0f,
+             [] (float v, int) { return "Nr. " + String (roundToInt (v * 100.0f) + 1); });
+        percent ("rh_dens", "Drums Dichte", 0.5f);
+        percent ("rh_var",  "Drums Variation", 0.15f);
+        flt ("rh_swing", "Drums Shuffle", { 0.0f, 0.5f, 0.001f }, 0.0f,
+             [] (float v, int) { return String (roundToInt (50.0f + v * 50.0f)) + " %"; });
+        percent ("rh_hum", "Drums Humanize", 0.0f);
+        percent ("rh_acc", "Drums Akzent", 0.5f);
+        layout.add (std::make_unique<AudioParameterInt> (ParameterID { "rh_len", 1 }, "Drums Laenge", 1, 16, 16,
+            AudioParameterIntAttributes().withStringFromValueFunction ([] (int v, int) { return String (v) + " Schritte"; })));
+        choice ("rh_rate", "Drums Raster", StringArray { "1/8", "1/16", "1/32" }, 1);
+        choice ("rh_fill", "Drums Fill", StringArray { "Aus", "4 Takte", "8 Takte", "16 Takte" }, 1);
+        percent ("rh_vol", "Drums Lautstaerke", 0.8f);
+        toggle ("rh_midi", "Drums auf MIDI-Kanal 10", true);
+        layout.add (std::make_unique<AudioParameterInt> (ParameterID { "tempo", 1 }, "Tempo ohne Host", 40, 240, 120,
+            AudioParameterIntAttributes().withStringFromValueFunction ([] (int v, int) { return String (v) + " BPM"; })));
+        for (int t = 0; t < rhythmTracks; ++t)
+        {
+            const String n = String ("Drums ") + rhythmTrackShort[t] + " ";
+            percent (rhId ("lv", t), n + "Pegel", 0.8f);
+            flt (rhId ("tu", t), n + "Stimmung", { -12.0f, 12.0f, 0.5f }, 0.0f,
+                 [] (float v, int) { return (v > 0 ? "+" : "") + String (v, 1) + " HT"; });
+            flt (rhId ("de", t), n + "Ausklang", { -1.0f, 1.0f, 0.001f }, 0.0f,
+                 [] (float v, int) { return "x" + String (std::pow (2.0f, v * 2.0f), 2); });
+            flt (rhId ("pn", t), n + "Panorama", { -1.0f, 1.0f, 0.001f }, 0.0f,
+                 [] (float v, int) { return std::abs (v) < 0.02f ? String ("Mitte") : (v < 0 ? "L " : "R ") + String (roundToInt (std::abs (v) * 100.0f)); });
+            toggle (rhId ("mu", t), n + "stumm", false);
+        }
+
         // Mod-Matrix
         for (int s = 0; s < numSources; ++s)
             for (int d = 0; d < numDests; ++d)
@@ -245,6 +289,52 @@ namespace Params
         std::atomic<float>* pitch[seqSteps];
         std::atomic<float>* on[seqSteps];
         std::atomic<float>* rows[seqRows][seqSteps];
+    };
+
+    // Werte des Drumcomputers pro Block
+    struct RhythmSnapshot
+    {
+        bool run = false, midi = true;
+        int kit = 1, rate = 1, length = 16, fill = 1;
+        float swing = 0, variation = 0.15f, humanize = 0, accent = 0.5f, volume = 0.8f;
+        float level[rhythmTracks] {}, tune[rhythmTracks] {}, decay[rhythmTracks] {}, pan[rhythmTracks] {};
+        bool mute[rhythmTracks] {};
+    };
+
+    class RhythmReader
+    {
+    public:
+        explicit RhythmReader (juce::AudioProcessorValueTreeState& s)
+        {
+            auto get = [&s] (const juce::String& id) { auto* v = s.getRawParameterValue (id); jassert (v != nullptr); return v; };
+            run = get ("rh_run"); midi = get ("rh_midi"); kit = get ("rh_kit"); rate = get ("rh_rate"); length = get ("rh_len");
+            fill = get ("rh_fill"); swing = get ("rh_swing"); variation = get ("rh_var"); humanize = get ("rh_hum");
+            accent = get ("rh_acc"); volume = get ("rh_vol");
+            for (int t = 0; t < rhythmTracks; ++t)
+            {
+                level[t] = get (rhId ("lv", t)); tune[t] = get (rhId ("tu", t)); decay[t] = get (rhId ("de", t));
+                pan[t] = get (rhId ("pn", t)); mute[t] = get (rhId ("mu", t));
+            }
+        }
+
+        RhythmSnapshot read() const
+        {
+            RhythmSnapshot p;
+            p.run = run->load() > 0.5f; p.midi = midi->load() > 0.5f;
+            p.kit = (int) kit->load(); p.rate = (int) rate->load(); p.length = (int) length->load(); p.fill = (int) fill->load();
+            p.swing = swing->load(); p.variation = variation->load(); p.humanize = humanize->load();
+            p.accent = accent->load(); p.volume = volume->load();
+            for (int t = 0; t < rhythmTracks; ++t)
+            {
+                p.level[t] = level[t]->load(); p.tune[t] = tune[t]->load(); p.decay[t] = decay[t]->load();
+                p.pan[t] = pan[t]->load(); p.mute[t] = mute[t]->load() > 0.5f;
+            }
+            return p;
+        }
+
+    private:
+        std::atomic<float> *run, *midi, *kit, *rate, *length, *fill, *swing, *variation, *humanize, *accent, *volume;
+        std::atomic<float> *level[rhythmTracks], *tune[rhythmTracks], *decay[rhythmTracks], *pan[rhythmTracks], *mute[rhythmTracks];
     };
 
     // Liest alle Parameter lock-frei aus dem APVTS

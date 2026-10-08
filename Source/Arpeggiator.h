@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Parameters.h"
+#include "Clock.h"
 
 // Arpeggiator: ersetzt gehaltene Noten durch eine taktsynchrone Notenfolge
 class Arpeggiator
@@ -12,6 +13,7 @@ public:
         int mode = 0, rate = 3, octaves = 1;
         bool hold = false;
         double bpm = 120.0;
+        Clock::Block clock;   // clock.sync: Sequenzer oder Drums laufen, der Arpeggiator rastet auf deren Takt ein
     };
 
     void prepare (double sr)
@@ -54,6 +56,11 @@ public:
 
         stepLength = sampleRate * 60.0 / s.bpm * Params::arpBeats[juce::jlimit (0, 5, s.rate)];
         settings = s;
+        stepBeats = Params::arpBeats[juce::jlimit (0, 5, s.rate)];
+        if (! s.clock.sync)
+            follower.joined = false;
+        else if (follower.joined && ! notes.isEmpty())
+            follower.begin (s.clock, stepBeats, 0.0);
 
         int pos = 0;
         for (const auto meta : midi)
@@ -94,7 +101,18 @@ private:
         while (true)
         {
             const double offAt  = currentNote >= 0 ? pos + noteOffIn : 1.0e12;
-            const double stepAt = notes.isEmpty() ? 1.0e12 : pos + samplesToStep;
+            double stepAt = notes.isEmpty() ? 1.0e12 : pos + samplesToStep;
+            if (settings.clock.sync)
+            {
+                if (notes.isEmpty())
+                    follower.joined = false;
+                else
+                {
+                    if (! follower.joined)
+                        follower.join (settings.clock.ppq + pos * settings.clock.perSample, stepBeats, 0.0);
+                    stepAt = juce::jmax (pos, follower.nextSample (settings.clock, stepBeats, 0.0));
+                }
+            }
             const double t = juce::jmin (offAt, stepAt);
 
             if (t >= to)
@@ -121,6 +139,8 @@ private:
                 out.addEvent (juce::MidiMessage::noteOn (1, currentNote, velocity), sample);
                 noteOffIn = stepLength * 0.5;
                 samplesToStep = stepLength;
+                if (settings.clock.sync)
+                    ++follower.k;
             }
         }
     }
@@ -156,7 +176,8 @@ private:
         return seq[step++ % seq.size()];
     }
 
-    double sampleRate = 44100.0, stepLength = 10000.0;
+    double sampleRate = 44100.0, stepLength = 10000.0, stepBeats = 0.25;
+    Clock::Follower follower;
     double samplesToStep = 0.0, noteOffIn = 0.0;
     juce::Array<int> notes, pressed;
     int currentNote = -1, step = 0;
