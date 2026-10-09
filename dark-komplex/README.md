@@ -6,6 +6,7 @@ Synthpop-Song-Generator: würfelt komplette Songs mit Gesang im Stil des dunklen
 (Pulswellen-Riffs, Oktav-Bass, Metall-Percussion, Chorflächen, Slide-Gitarre, tiefe Baritonstimme).
 Von Andreas Engel, Darmstadt, Deutschland. Instrument als AU, VST3 und Standalone (JUCE 8, CMake).
 Gestaltung wie TRENDY ANDY: Design-Umschalter 1980 / 2100, Taster-Reiter, Querformat ohne Scrollen.
+Das Design 1980 ist einem Sampler der Achtziger nachempfunden (Kittblech, dunkle Bedienleiste, grünliches LCD, Folientasten), ohne Logos oder Markennamen.
 
 Alles wird nach Stilregeln neu erfunden und synthetisch erzeugt: keine Samples, keine Melodien, Akkordfolgen oder Texte aus Originalaufnahmen.
 Die Stimme ist eine synthetische Baritonstimme aus Formantfiltern (tief, dunkel, nah) und kein Nachbau einer echten Stimme.

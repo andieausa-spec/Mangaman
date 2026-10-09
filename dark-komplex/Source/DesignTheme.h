@@ -3,7 +3,8 @@
 #include <JuceHeader.h>
 
 // Zwei Gestaltungen der Oberfläche:
-//  1980: dunkles Plastik, Schieberegler statt Potis, Beschriftung und Skalen aufgedruckt (Roland-Geräte jener Zeit)
+//  1980: Sampler-Gehäuse der Achtziger: kittfarbenes Blech, dunkle Bedienleiste, grünlich hinterleuchtete LCD-Anzeige,
+//        Folientasten und Schieberegler, Beschriftung aufgedruckt (nachempfunden, ohne Logos)
 //  2100: hell, steril, minimalistisch, große griffige Gummipotis, scharfe blaue Schrift, die von innen durchscheint
 namespace Design
 {
@@ -13,6 +14,7 @@ namespace Design
     {
         int style = Future2100;
         juce::Colour body, panel, line, knob, knobTrack, field, ink, dim, accent, glow;
+        juce::Colour bezel, bezelInk, lcdBack, lcdInk, lcdGhost;   // dunkle Bedienleiste und LCD (nur 1980)
         bool faders() const { return style == Retro1980; }
     };
 
@@ -22,11 +24,14 @@ namespace Design
         t.style = style == Retro1980 ? Retro1980 : Future2100;
         if (t.faders())
         {
-            t.body = juce::Colour (0xff1c1d20);   t.panel = juce::Colour (0xff27282c);
-            t.line = juce::Colour (0xffbdbdb6);   t.knob = juce::Colour (0xff121315);
-            t.knobTrack = juce::Colour (0xff44464c); t.field = juce::Colour (0xff151619);
-            t.ink = juce::Colour (0xffefeee8);    t.dim = juce::Colour (0xffa4a6ab);
-            t.accent = juce::Colour (0xfff2672a); t.glow = juce::Colours::transparentBlack;
+            t.body = juce::Colour (0xffd3cdbf);   t.panel = juce::Colour (0xffe2dccf);
+            t.line = juce::Colour (0xff4a4238);   t.knob = juce::Colour (0xff2a2826);
+            t.knobTrack = juce::Colour (0xffaaa293); t.field = juce::Colour (0xffefeadf);
+            t.ink = juce::Colour (0xff2a251f);    t.dim = juce::Colour (0xff6c6458);
+            t.accent = juce::Colour (0xff2f6db5); t.glow = juce::Colours::transparentBlack;
+            t.bezel = juce::Colour (0xff2b2926); t.bezelInk = juce::Colour (0xffe9e3d6);
+            t.lcdBack = juce::Colour (0xffa6ba52); t.lcdInk = juce::Colour (0xff17200b);
+            t.lcdGhost = juce::Colour (0x1c17200b);
         }
         else
         {
@@ -39,7 +44,7 @@ namespace Design
         return t;
     }
 
-    // Feine Körnung für das dunkle Plastik (nahtlos kachelbar)
+    // Feine Körnung für das Gehäuse (nahtlos kachelbar)
     inline juce::Image plasticGrain()
     {
         const int size = 160;
@@ -48,7 +53,7 @@ namespace Design
         juce::Image::BitmapData data (img, juce::Image::BitmapData::writeOnly);
         for (int y = 0; y < size; ++y)
             for (int x = 0; x < size; ++x)
-                data.setPixelColour (x, y, juce::Colours::white.withAlpha (rng.nextFloat() * 0.05f));
+                data.setPixelColour (x, y, juce::Colours::black.withAlpha (rng.nextFloat() * 0.06f));
         return img;
     }
 

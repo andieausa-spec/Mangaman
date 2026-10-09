@@ -329,15 +329,15 @@ namespace
         void paint (juce::Graphics& g) override
         {
             const auto& th = lookOf (*this).getTheme();
-            static const juce::Colour stripes[] { juce::Colour (0xffd8382c), juce::Colour (0xfff08a24),
-                                                  juce::Colour (0xfff2c230), juce::Colour (0xff3f86d8) };
+            static const juce::Colour stripes[] { juce::Colour (0xff2f6db5), juce::Colour (0xff2f6db5),
+                                                  juce::Colour (0xff2f6db5), juce::Colour (0xff2f6db5) };
             int index = 0;
             for (auto& p : panels)
             {
                 const auto r = p.bounds.toFloat();
                 if (th.faders())
                 {
-                    // 1980: aufgedruckter Rahmen, weißes Titelschild mit farbigem Streifen
+                    // 1980: aufgedruckter Rahmen, dunkles Titelschild mit blauem Streifen
                     g.setColour (th.line.withAlpha (0.55f));
                     g.drawRect (r.reduced (0.5f), 1.0f);
                     g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
@@ -403,27 +403,31 @@ namespace
             auto r = getLocalBounds().toFloat().reduced (2.0f);
             if (th.faders())
             {
-                g.setColour (juce::Colours::black.withAlpha (0.6f));
-                g.fillRoundedRectangle (r.translated (0.0f, 1.5f), 3.0f);
-                g.setColour (juce::Colour (0xff0a0505));
+                // LCD-Fenster im schwarzen Rahmen, grünlich hinterleuchtet
+                g.setColour (juce::Colours::black);
                 g.fillRoundedRectangle (r, 3.0f);
-                g.setColour (juce::Colour (0xff3a3b40));
-                g.drawRoundedRectangle (r, 3.0f, 1.5f);
-                auto inner = r.reduced (12.0f, 6.0f);
+                auto glass = r.reduced (6.0f);
+                juce::ColourGradient lcd (th.lcdBack.brighter (0.12f), glass.getCentreX(), glass.getY(),
+                                          th.lcdBack.darker (0.18f), glass.getCentreX(), glass.getBottom(), false);
+                g.setGradientFill (lcd);
+                g.fillRect (glass);
+                g.setColour (juce::Colours::black.withAlpha (0.25f));
+                g.drawRect (glass, 1.5f);
+                auto inner = r.reduced (14.0f, 7.0f);
                 auto top = inner.removeFromTop (inner.getHeight() * 0.66f);
                 const juce::FontOptions digits (juce::Font::getDefaultMonospacedFontName(), top.getHeight() * 0.9f, juce::Font::bold);
                 g.setFont (digits);
                 // nicht leuchtende Segmente schimmern durch
-                g.setColour (juce::Colour (0xff2a0806));
+                g.setColour (th.lcdGhost);
                 juce::String ghost;
                 for (auto ch : bigText)
                     ghost << (juce::CharacterFunctions::isDigit (ch) ? juce::juce_wchar ('8') : juce::juce_wchar (' '));
                 g.drawText (ghost, top, juce::Justification::centredLeft);
-                g.setColour (juce::Colour (0x55ff2a14));
-                g.drawText (bigText, top.translated (0.0f, 0.5f).expanded (1.0f), juce::Justification::centredLeft);
-                g.setColour (juce::Colour (0xffff3b24));
+                g.setColour (th.lcdInk.withAlpha (0.25f));
+                g.drawText (bigText, top.translated (1.0f, 1.0f), juce::Justification::centredLeft);
+                g.setColour (th.lcdInk);
                 g.drawText (bigText, top, juce::Justification::centredLeft);
-                g.setColour (juce::Colour (0xffd8402a));
+                g.setColour (th.lcdInk.withAlpha (0.8f));
                 g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::bold));
                 g.drawText (smallText, inner, juce::Justification::centredLeft);
             }
@@ -529,7 +533,7 @@ namespace
             auto face = r.translated (0.0f, on ? 4.0f : highlighted ? 1.0f : 0.0f);
             if (th.faders())
             {
-                // 1980: farbige Gummitaste wie bei den Drumcomputern
+                // 1980: Folientaste des Samplers, leicht gewölbt
                 const auto cap = colour1980.withMultipliedBrightness (on ? 1.15f : 0.9f);
                 juce::ColourGradient grad (cap.brighter (0.25f), face.getX(), face.getY(), cap.darker (0.35f), face.getX(), face.getBottom(), false);
                 g.setGradientFill (grad);
@@ -904,7 +908,7 @@ namespace
                                   juce::Justification::centredLeft, ink);
 
                 const auto inner = row.withTrimmedLeft ((float) headerW).reduced (0.0f, 4.0f);
-                const auto col = th.faders() ? juce::Colour (0xfff1ede4) : th.accent;
+                const auto col = th.faders() ? th.ink : th.accent;
                 auto yFor = [&] (int pitch)
                 {
                     const float t = (float) (pitch - ranges[lane][0]) / (float) (ranges[lane][1] - ranges[lane][0]);
@@ -1026,13 +1030,13 @@ namespace
         {
             const auto& th = lookOf (*this).getTheme();
             auto r = getLocalBounds().toFloat();
-            const auto lit = th.faders() ? juce::Colour (0xffff3b24) : th.accent;
+            const auto lit = th.faders() ? th.lcdInk : th.accent;
             if (th.faders())
             {
-                g.setColour (juce::Colour (0xff0a0505));
+                g.setColour (juce::Colours::black);
                 g.fillRoundedRectangle (r, 3.0f);
-                g.setColour (juce::Colour (0xff3a3b40));
-                g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.5f);
+                g.setColour (th.lcdBack);
+                g.fillRect (r.reduced (6.0f));
             }
             else
             {
@@ -1051,7 +1055,7 @@ namespace
             const auto& sec = song->sections[(size_t) song->sectionIndexAt (shownBeat)];
             auto header = r.removeFromTop (20.0f);
             g.setFont (juce::FontOptions (12.0f, juce::Font::bold).withKerningFactor (0.12f));
-            g.setColour (th.faders() ? juce::Colour (0xffd8402a) : th.dim);
+            g.setColour (th.faders() ? th.lcdInk.withAlpha (0.75f) : th.dim);
             g.drawText (DarkK::upper (DarkK::sectionName (sec.type)) + (sec.lanes[DarkK::Vocal] ? juce::String() : juce::String::fromUTF8 ("  \xc2\xb7  GESANG PAUSIERT")),
                         header, juce::Justification::centredLeft);
             g.drawText (vocalOn ? juce::String::fromUTF8 ("REFRAIN-WORT \xc2\xbb") + DarkK::upper (song->hookWord) + juce::String::fromUTF8 ("\xc2\xab") : "GESANG AUS",
@@ -1082,7 +1086,7 @@ namespace
             auto yFor = [&] (int p) { return r.getBottom() - r.getHeight() * (float) (p - lo) / (float) juce::jmax (1, hi - lo); };
 
             // Hilfslinien
-            g.setColour ((th.faders() ? juce::Colour (0xff3a1a14) : th.line));
+            g.setColour ((th.faders() ? th.lcdInk.withAlpha (0.2f) : th.line));
             for (int k = 0; k < 4; ++k)
                 g.drawHorizontalLine (juce::roundToInt (r.getY() + r.getHeight() * (float) k / 3.0f), r.getX(), r.getRight());
 
@@ -1097,14 +1101,14 @@ namespace
                     g.setColour (lit.withAlpha (0.3f));
                     g.fillRoundedRectangle (bar.expanded (4.0f), 8.0f);
                 }
-                g.setColour (now ? lit : (th.faders() ? juce::Colour (0xff7a2a20) : th.dim.withAlpha (vocalOn ? 0.8f : 0.3f)));
+                g.setColour (now ? lit : (th.faders() ? th.lcdInk.withAlpha (0.35f) : th.dim.withAlpha (vocalOn ? 0.8f : 0.3f)));
                 g.fillRoundedRectangle (bar, th.faders() ? 2.0f : 6.0f);
 
                 // Silbe darunter; Wortenden bekommen Abstand, sonst Bindestrich
                 juce::String text = DarkK::Phon::text (n.syllable);
                 if (! n.wordEnd && k < last) text << "-";
                 g.setFont (juce::FontOptions (now ? 26.0f : 20.0f, juce::Font::bold));
-                g.setColour (now ? lit : (th.faders() ? juce::Colour (0xffd8402a) : th.ink.withAlpha (vocalOn ? 0.75f : 0.3f)));
+                g.setColour (now ? lit : (th.faders() ? th.lcdInk.withAlpha (0.55f) : th.ink.withAlpha (vocalOn ? 0.75f : 0.3f)));
                 g.drawText (text, juce::Rectangle<float> (x0 - 4.0f, textRow.getY(), juce::jmax (40.0f, x1 - x0 + 30.0f), textRow.getHeight()),
                             juce::Justification::centredLeft);
             }
@@ -1203,7 +1207,7 @@ namespace
 
             // Design-Umschalter: zwei Taster
             const char* designTitles[] { "1980", "2100" };
-            const char* designSubs[]   { "Plastik, Schieberegler", "Minimal, Gummipotis" };
+            const char* designSubs[]   { "Sampler, Schieberegler", "Minimal, Gummipotis" };
             for (int i = 0; i < 2; ++i)
             {
                 auto* b = designButtons.add (new TabButton (designTitles[i], designSubs[i], 1002));
@@ -1231,20 +1235,20 @@ namespace
             addAndMakeVisible (display);
             addAndMakeVisible (meter);
 
-            startPad.colour1980 = juce::Colour (0xff4bd04b);
+            startPad.colour1980 = juce::Colour (0xff7cb85e);
             startPad.onClick = [this] { processor.setRunning (! processor.running.load()); timerCallback(); };
             addAndMakeVisible (startPad);
-            homePad.colour1980 = juce::Colour (0xffeeeae0);
+            homePad.colour1980 = juce::Colour (0xffe6e1d6);
             homePad.onClick = [this] { processor.seek (0.0); };
             addAndMakeVisible (homePad);
-            vocalPad.colour1980 = juce::Colour (0xff3f86d8);
+            vocalPad.colour1980 = juce::Colour (0xff5a92d6);
             vocalPad.setClickingTogglesState (true);
             vocalAttachment = std::make_unique<ButtonAttachment> (processor.apvts, "vocal_on", vocalPad);
             addAndMakeVisible (vocalPad);
-            rollPad.colour1980 = juce::Colour (0xffd8382c);
+            rollPad.colour1980 = juce::Colour (0xffd0503a);
             rollPad.onClick = [this] { processor.rollNewTrack(); };
             addAndMakeVisible (rollPad);
-            variationPad.colour1980 = juce::Colour (0xfff2c230);
+            variationPad.colour1980 = juce::Colour (0xffb9c0c8);
             variationPad.onClick = [this] { processor.rollVariation(); };
             addAndMakeVisible (variationPad);
 
@@ -1266,13 +1270,13 @@ namespace
             const auto& th = look.getTheme();
             if (th.faders())
             {
-                g.setColour (th.ink);
-                g.setFont (juce::FontOptions (31.0f, juce::Font::bold | juce::Font::italic).withKerningFactor (0.1f));
+                g.setColour (th.bezelInk);
+                g.setFont (juce::FontOptions (31.0f, juce::Font::bold).withKerningFactor (0.14f));
                 g.drawText ("DARK KOMPLEX", 20, 12, 380, 38, juce::Justification::centredLeft);
-                g.setColour (th.accent);
+                g.setColour (th.accent.brighter (0.6f));
                 g.setFont (juce::FontOptions (13.0f, juce::Font::bold).withKerningFactor (0.15f));
                 g.drawText ("SYNTHPOP SONG GENERATOR " + versionLabel(), 410, 14, 360, 18, juce::Justification::centredLeft);
-                g.setColour (th.dim);
+                g.setColour (th.bezelInk.withAlpha (0.7f));
                 g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.1f));
                 g.drawText (makerLabel(), 410, 32, 360, 16, juce::Justification::centredLeft);
             }
@@ -1285,7 +1289,7 @@ namespace
                 g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.1f));
                 Design::drawText (g, th, makerLabel(), { 410.0f, 32.0f, 360.0f, 16.0f }, juce::Justification::centredLeft, th.dim);
             }
-            g.setColour (th.dim);
+            g.setColour (th.faders() ? th.bezelInk.withAlpha (0.7f) : th.dim);
             g.setFont (juce::FontOptions (11.0f, juce::Font::bold).withKerningFactor (0.15f));
             g.drawText ("DESIGN", 944, 42, 160, 18, juce::Justification::centredLeft);
         }
@@ -1591,10 +1595,19 @@ namespace
                 g.fillAll (th.body);
                 g.setTiledImageFill (grain, 0, 0, 1.0f);
                 g.fillAll();
-                juce::ColourGradient shade (juce::Colours::white.withAlpha (0.05f), 0.0f, 0.0f,
-                                            juce::Colours::black.withAlpha (0.15f), 0.0f, r.getBottom(), false);
+                juce::ColourGradient shade (juce::Colours::white.withAlpha (0.08f), 0.0f, 0.0f,
+                                            juce::Colours::black.withAlpha (0.08f), 0.0f, r.getBottom(), false);
                 g.setGradientFill (shade);
                 g.fillAll();
+                // dunkle Bedienleiste oben mit blauer Zierlinie, darunter das Kittblech
+                auto band = r.withHeight (132.0f);
+                juce::ColourGradient bandGrad (th.bezel.brighter (0.15f), 0.0f, 0.0f, th.bezel.darker (0.2f), 0.0f, band.getBottom(), false);
+                g.setGradientFill (bandGrad);
+                g.fillRect (band);
+                g.setColour (th.accent);
+                g.fillRect (band.getX(), band.getBottom() - 4.0f, band.getWidth(), 3.0f);
+                g.setColour (juce::Colours::black.withAlpha (0.35f));
+                g.fillRect (band.getX(), band.getBottom() - 1.0f, band.getWidth(), 1.0f);
             }
             else
             {
@@ -1604,7 +1617,7 @@ namespace
                 g.fillAll();
             }
 
-            g.setColour (th.faders() ? juce::Colour (0xff121315) : juce::Colour (0xffdde1e6));
+            g.setColour (th.faders() ? th.bezel : juce::Colour (0xffdde1e6));
             g.fillRoundedRectangle (juce::Rectangle<float> (12.0f, (float) getHeight() - 124.0f, (float) getWidth() - 24.0f, 116.0f),
                                     th.faders() ? 3.0f : 18.0f);
         }
