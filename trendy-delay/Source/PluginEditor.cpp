@@ -168,6 +168,9 @@ namespace
             slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 16);
             addAndMakeVisible (slider);
             attachment = std::make_unique<SliderAttachment> (s, id, slider);
+            // Doppelklick setzt auf den Grundwert zurück
+            if (auto* prm = s.getParameter (id))
+                slider.setDoubleClickReturnValue (true, prm->convertFrom0to1 (prm->getDefaultValue()));
         }
 
         void layoutControl (juce::Rectangle<int> r) override
