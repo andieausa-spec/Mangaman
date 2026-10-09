@@ -439,6 +439,18 @@ int main()
         ok &= report ("Zufallsregler", good, juce::String::formatted ("8 Runden, groesste Spitze %.3f", worst));
     }
 
+    // Optional: Notenzahl je Spur und Titel für jede Epoche (Abgleich mit der Web-Version)
+    if (std::getenv ("MADONNATOR_COUNTS") != nullptr)
+        for (int e = 0; e < Mdn::numEras; ++e)
+        {
+            auto s = baseSettings();
+            s.era = e;
+            const auto song = Mdn::generate (s);
+            std::printf ("Epoche %d: %s |", e, song.title.toRawUTF8());
+            for (auto& lane : song.notes) std::printf (" %d", (int) lane.size());
+            std::printf (" | Skala %d\n", song.scaleIndex);
+        }
+
     // Optional: Abschnitte und Spuren vieler Songs auflisten (MADONNATOR_DUMP = Anzahl Songs)
     if (auto* dump = std::getenv ("MADONNATOR_DUMP"))
     {
