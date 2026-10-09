@@ -676,7 +676,7 @@ namespace Kt
             if ((lex.style == Technik && r.chance (0.25f + 0.3f * closeness)) || lex.style == OwnText)
             {
                 const auto t = lex.hookText;
-                return t.substring (0, 1).toUpperCase() + t.substring (1);
+                return upper (t.substring (0, 1)) + t.substring (1);
             }
             struct Noun { const char* word; char gender; };
             static const Noun nouns[] { { "Takt", 'm' }, { "Strom", 'm' }, { "Signal", 'n' }, { "Netz", 'n' }, { "Kanal", 'm' },

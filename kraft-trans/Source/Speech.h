@@ -303,7 +303,9 @@ namespace Kt::Phon
         };
         for (auto c : text)
         {
-            const bool letter = juce::CharacterFunctions::isLetter (c) || c == 0xdf;
+            // Buchstaben fest definiert (nicht vom Gebietsschema abhängig): a-z, A-Z, Umlaute und ß
+            const bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                                || c == 0xe4 || c == 0xf6 || c == 0xfc || c == 0xc4 || c == 0xd6 || c == 0xdc || c == 0xdf;
             const bool digit = juce::CharacterFunctions::isDigit (c);
             if (letter || digit)
             {

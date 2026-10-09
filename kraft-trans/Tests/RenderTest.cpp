@@ -626,6 +626,15 @@ int main()
             proc.applyEraSound (e);
             set (proc, "tempo", (float) Kt::suggestTempo (19780519u + (juce::uint32) e, e, 0.8f));
         }
+        if (auto* style = std::getenv ("KRAFT_TRANS_WAV_STYLE"))  // Text: 0 Technik, 1 Zahlen, 2 Lautmalerei, 3 Eigener Text
+            set (proc, "vocal_text", (float) juce::String (style).getIntValue());
+        if (auto* text = std::getenv ("KRAFT_TRANS_WAV_TEXT"))    // eigener Text (schaltet auf Eigener Text)
+        {
+            proc.setOwnText (juce::String::fromUTF8 (text));
+            set (proc, "vocal_text", (float) Kt::OwnText);
+        }
+        if (auto* voice = std::getenv ("KRAFT_TRANS_WAV_VOICE"))  // Stimmart: 0 Vocoder, 1 Sprachchip, 2 Roboter
+            set (proc, "voice_type", (float) juce::String (voice).getIntValue());
         if (auto* solo = std::getenv ("KRAFT_TRANS_WAV_SOLO"))   // z. B. "vocal": nur diese Spur
             set (proc, "solo_" + juce::String (solo), 1.0f);
         set (proc, "loop", 0.0f);
