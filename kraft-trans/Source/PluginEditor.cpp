@@ -1415,13 +1415,13 @@ namespace
                 need += w;
             }
             const int gaps = 12 * ((int) indices.size() - 1);
-            const float extra = juce::jmax (0.0f, (float) (width - gaps - need) / (float) indices.size());
+            const float extra = (float) (width - gaps - need) / (float) indices.size();   // negativ: Felder rücken zusammen
             int x = x0;
             for (int i : indices)
             {
                 int w = 28;
                 for (auto* c : pg.panels[(size_t) i].items) w += c->preferredWidth() + 8;
-                const int wdt = (int) ((float) w + extra);
+                const int wdt = i == *(indices.end() - 1) ? x0 + width - x : (int) ((float) w + extra);
                 pg.panels[(size_t) i].bounds = { x, y, wdt, h };
                 x += wdt + 12;
             }
@@ -1510,13 +1510,13 @@ namespace
         {
             auto& pg = *pages[2];
             pg.panels = {
-                { de ("FLÄCHEN"), {}, { choice (pg, "pad_type", "Klang", 112), knob (pg, "pad_bright", "Helligkeit", 72),
-                                        knob (pg, "pad_attack", "Anschwellen", 72), knob (pg, "pad_ensemble", "Ensemble", 72),
-                                        knob (pg, "pad_vowel", "Chor-Vokal", 72) } },
-                { "SEQUENZ", {}, { knob (pg, "seq_cutoff", "Cutoff", 72), knob (pg, "seq_reso", "Resonanz", 72),
-                                knob (pg, "seq_env", "Filterkurve", 72), knob (pg, "seq_decay", "Abklingen", 72),
-                                choice (pg, "seq_wave", "Welle", 92) } },
-                { de ("GERÄUSCHE"), {}, { knob (pg, "fx_noise", "Rauschen", 72), knob (pg, "fx_machine", "Maschinen", 72), knob (pg, "fx_signal", "Signale", 72) } },
+                { de ("FLÄCHEN"), {}, { choice (pg, "pad_type", "Klang", 100), knob (pg, "pad_bright", "Helligkeit", 64),
+                                        knob (pg, "pad_attack", "Anschwellen", 64), knob (pg, "pad_ensemble", "Ensemble", 64),
+                                        knob (pg, "pad_vowel", "Chor-Vokal", 64) } },
+                { "SEQUENZ", {}, { knob (pg, "seq_cutoff", "Cutoff", 64), knob (pg, "seq_reso", "Resonanz", 64),
+                                knob (pg, "seq_env", "Filterkurve", 64), knob (pg, "seq_decay", "Abklingen", 64),
+                                choice (pg, "seq_wave", "Welle", 84) } },
+                { de ("GERÄUSCHE"), {}, { knob (pg, "fx_noise", "Rauschen", 64), knob (pg, "fx_machine", "Maschinen", 64), knob (pg, "fx_signal", "Signale", 64) } },
                 { "BASS", {}, { knob (pg, "bass_cutoff", "Cutoff", 72), knob (pg, "bass_decay", "Abklingen", 72), knob (pg, "bass_sub", "Sub", 72),
                                 knob (pg, "bass_drive", "Biss", 72) } },
                 { "MELODIE", {}, { knob (pg, "lead_glide", "Gleiten", 72), knob (pg, "lead_vibrato", "Vibrato", 72),

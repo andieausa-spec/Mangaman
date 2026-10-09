@@ -45,7 +45,7 @@ Im Host folgt der Song dem Transport und Tempo des Hosts. MIDI-Tasten rücken de
     cmake -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build --config Release
 
-Selbsttest (22 Prüfungen):
+Selbsttest (19 Prüfungen):
 
     cmake -B build -DKRAFT_TRANS_TESTS=ON && cmake --build build --target KraftTransRenderTest
     KRAFT_TRANS_SNAPSHOT=Bilder ./build/KraftTransRenderTest_artefacts/Release/KraftTransRenderTest

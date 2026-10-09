@@ -54,7 +54,7 @@ namespace Kt
             "unterwegs: hüpfender Oktav-Bass, Flöte und Orgel, sanfte Elektro-Drums, Autos ziehen vorbei",
             "Funkwellen: Chorflächen, langsame Pulse, Zählrohr-Knacken und Morsezeichen",
             "auf Schienen: Metall-Percussion im Fahrrhythmus, Streicherflächen, Zuggeräusche",
-            "Maschinenpark: Sechzehntel-Sequenzen, Syndrum-Toms, Vocoder",
+            "Maschinenpark: Sechzehntel-Sequenzen, Syndrum-Toms, Roboterstimme",
             "Rechenzentrum: Piepser-Melodien, Sprachchip, Datengeräusche, knackige Snare",
             "digital: harte Drums mit Klatschen und Metall, Glocken, Sprechrhythmus",
         };
