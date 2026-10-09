@@ -8,6 +8,17 @@ namespace
 
     MangamanLook& lookOf (juce::Component& c) { return static_cast<MangamanLook&> (c.getLookAndFeel()); }
 
+    // Versionsanzeige aus CMakeLists (0.6.0 -> "V0.6")
+    juce::String versionLabel()
+    {
+        auto v = juce::String (JucePlugin_VersionString);
+        while (v.endsWith (".0") && v.containsChar ('.') && v.indexOfChar ('.') != v.lastIndexOfChar ('.'))
+            v = v.dropLastCharacters (2);
+        return "V" + v;
+    }
+
+    juce::String makerLabel() { return juce::String::fromUTF8 ("ANDREAS ENGEL \xc2\xb7 DARMSTADT \xc2\xb7 DEUTSCHLAND"); }
+
     //==========================================================================
     // Drehregler mit Gummi-Kappe: gibt beim Berühren nach, folgt dem Wert federnd
     class RubberSlider : public juce::Slider, private juce::Timer
@@ -826,18 +837,23 @@ namespace
             if (th.faders())
             {
                 g.setColour (th.ink);
-                g.setFont (juce::FontOptions (32.0f, juce::Font::bold | juce::Font::italic).withKerningFactor (0.18f));
-                g.drawText ("MANGAMAN", 20, 12, 320, 38, juce::Justification::centredLeft);
+                g.setFont (juce::FontOptions (32.0f, juce::Font::bold | juce::Font::italic).withKerningFactor (0.12f));
+                g.drawText ("TRENDY ANDY", 20, 12, 300, 38, juce::Justification::centredLeft);
                 g.setColour (th.accent);
                 g.setFont (juce::FontOptions (13.0f, juce::Font::bold).withKerningFactor (0.15f));
-                g.drawText ("HYBRID SYNTHESIZER", 300, 14, 220, 36, juce::Justification::centredLeft);
+                g.drawText ("HYBRID SYNTHESIZER " + versionLabel(), 300, 14, 260, 18, juce::Justification::centredLeft);
+                g.setColour (th.dim);
+                g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.1f));
+                g.drawText (makerLabel(), 300, 32, 300, 16, juce::Justification::centredLeft);
             }
             else
             {
-                g.setFont (juce::FontOptions (30.0f, juce::Font::bold).withKerningFactor (0.14f));
-                Design::drawText (g, th, "MANGAMAN", { 20.0f, 12.0f, 320.0f, 38.0f }, juce::Justification::centredLeft, th.ink);
+                g.setFont (juce::FontOptions (30.0f, juce::Font::bold).withKerningFactor (0.1f));
+                Design::drawText (g, th, "TRENDY ANDY", { 20.0f, 12.0f, 290.0f, 38.0f }, juce::Justification::centredLeft, th.ink);
                 g.setFont (juce::FontOptions (13.0f, juce::Font::bold).withKerningFactor (0.15f));
-                Design::drawText (g, th, "HYBRID SYNTHESIZER", { 290.0f, 14.0f, 220.0f, 36.0f }, juce::Justification::centredLeft, th.dim);
+                Design::drawText (g, th, "HYBRID SYNTHESIZER " + versionLabel(), { 300.0f, 14.0f, 260.0f, 18.0f }, juce::Justification::centredLeft, th.dim);
+                g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.1f));
+                Design::drawText (g, th, makerLabel(), { 300.0f, 32.0f, 300.0f, 16.0f }, juce::Justification::centredLeft, th.dim);
             }
             g.setColour (th.dim);
             g.setFont (juce::FontOptions (11.0f, juce::Font::bold).withKerningFactor (0.15f));

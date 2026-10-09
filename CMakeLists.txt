@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Mangaman VERSION 0.2.0)
+project(Mangaman VERSION 0.6.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,7 +25,8 @@ else()
 endif()
 
 juce_add_plugin(Mangaman
-    COMPANY_NAME "Andi"
+    COMPANY_NAME "Andreas Engel"
+    COMPANY_COPYRIGHT "Andreas Engel, Darmstadt, Deutschland"
     BUNDLE_ID "com.andi.mangaman"
     PLUGIN_MANUFACTURER_CODE Andi
     PLUGIN_CODE Mgmn
@@ -35,7 +36,7 @@ juce_add_plugin(Mangaman
     IS_MIDI_EFFECT FALSE
     COPY_PLUGIN_AFTER_BUILD TRUE
     FORMATS AU VST3 Standalone
-    PRODUCT_NAME "Mangaman")
+    PRODUCT_NAME "TRENDY ANDY")
 
 juce_generate_juce_header(Mangaman)
 

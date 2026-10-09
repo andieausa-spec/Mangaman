@@ -23,7 +23,7 @@ jobs:
         run: bash packaging/macos/make-dmg.sh "$VERSION"
       - uses: actions/upload-artifact@v4
         with:
-          name: Mangaman-macOS
+          name: TrendyAndy-macOS
           path: dist/*.dmg
 
   windows:
@@ -49,7 +49,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
-          name: Mangaman-Windows
+          name: TrendyAndy-Windows
           path: dist/*.exe
 
   release:
@@ -67,13 +67,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
-          name: Mangaman ${{ env.VERSION }}
+          name: TRENDY ANDY ${{ env.VERSION }}
           make_latest: true
           files: |
             dist/*.dmg
             dist/*.exe
           body: |
-            **macOS** (11 oder neuer, Apple Silicon + Intel): `.dmg` öffnen, `Mangaman Installer.pkg` starten. Installiert AU, VST3 und die Standalone-App.
+            **macOS** (11 oder neuer, Apple Silicon + Intel): `.dmg` öffnen, `TRENDY ANDY Installer.pkg` starten. Installiert AU, VST3 und die Standalone-App.
             **Windows** (10/11, 64 Bit): `Setup.exe` starten. Installiert VST3 und die Standalone-App.
 
             Die Installer sind nicht signiert. macOS: Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“. Windows: „Weitere Informationen“ → „Trotzdem ausführen“.
