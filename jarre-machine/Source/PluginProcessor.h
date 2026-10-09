@@ -62,7 +62,7 @@ public:
     // eigener Transport (Standalone oder wenn der Host steht)
     std::atomic<bool> running { false };
 
-    // Design der Oberfläche: 0 = 1980 (Schieberegler), 1 = 2100 (Gummipotis); wird mit dem Projekt gespeichert
+    // Design der Oberfläche: 0 = 1970 (Schieberegler), 1 = 2100 (Gummipotis); wird mit dem Projekt gespeichert
     std::atomic<int> design { 1 };
 
 private:

@@ -26,6 +26,12 @@ namespace
     public:
         explicit RubberSlider (bool isMini = false) : mini (isMini)
         {
+            // 1970: jeder Schieberegler hat etwas Spiel, sitzt leicht schief und hat seine eigene Kappenfarbe
+            static int counter = 0;
+            capIndex = counter++;
+            auto& rng = juce::Random::getSystemRandom();
+            play = (rng.nextFloat() - 0.5f) * 0.14f;
+            side = (rng.nextFloat() - 0.5f) * 3.0f;
             setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
             setMouseDragSensitivity (220);
             if (mini)
@@ -35,7 +41,7 @@ namespace
             }
         }
 
-        // Design 1980: Fader statt Drehregler (kleine liegen waagerecht)
+        // Design 1970: Fader statt Drehregler (kleine liegen waagerecht), Wert darunter
         void setFaderMode (bool f)
         {
             fader = f;
@@ -44,7 +50,7 @@ namespace
                 setSliderStyle (mini ? juce::Slider::LinearHorizontal : juce::Slider::LinearVertical);
                 setSliderSnapsToMousePosition (false);
                 if (! mini)
-                    setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+                    setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 16);
             }
             else
             {
@@ -66,7 +72,8 @@ namespace
             const auto layout = getLookAndFeel().getSliderLayout (*this);
             if (fader)
             {
-                lookOf (*this).drawFader (g, layout.sliderBounds.toFloat(), shown, getMinimum() < 0.0 && getMaximum() > 0.0, mini, squish);
+                lookOf (*this).drawFader (g, layout.sliderBounds.toFloat(), shown, getMinimum() < 0.0 && getMaximum() > 0.0, mini, squish,
+                                          juce::jlimit (-0.35f, 0.35f, play + tilt), side + juce::jlimit (-3.0f, 3.0f, tilt * 6.0f), capIndex);
                 return;
             }
             const auto rp = getRotaryParameters();
@@ -95,6 +102,15 @@ namespace
             squishTarget = 1.0f;
             animate();
         }
+        void mouseDrag (const juce::MouseEvent& e) override
+        {
+            juce::Slider::mouseDrag (e);
+            if (fader)
+            {
+                tilt += (juce::Random::getSystemRandom().nextFloat() - 0.5f) * 0.05f;   // der alte Regler ruckelt im Schlitz
+                animate();
+            }
+        }
         void mouseUp (const juce::MouseEvent& e) override
         {
             juce::Slider::mouseUp (e);
@@ -109,25 +125,33 @@ namespace
         {
             const float target = (float) valueToProportionOfLength (getValue());
             const float err = target - shown;
-            velocity = velocity * 0.5f + err * 0.35f;     // leichtes Überschwingen wie Gummi
+            if (fader)
+            {
+                velocity = velocity * 0.8f + err * 0.16f;     // lockerer Schieber: schwingt nach und kippt dabei
+                tilt = tilt * 0.86f + velocity * 2.6f;
+            }
+            else
+                velocity = velocity * 0.5f + err * 0.35f;     // leichtes Überschwingen wie Gummi
             shown += velocity;
 
             const float sqErr = squishTarget - squish;
             squishVelocity = squishVelocity * 0.55f + sqErr * 0.3f;
             squish += squishVelocity;
 
-            if (std::abs (err) < 1.0e-4f && std::abs (velocity) < 1.0e-4f
+            if (std::abs (err) < 1.0e-4f && std::abs (velocity) < 1.0e-4f && std::abs (tilt) < 2.0e-3f
                 && std::abs (sqErr) < 1.0e-3f && std::abs (squishVelocity) < 1.0e-3f)
             {
                 shown = target;
                 squish = squishTarget;
+                tilt = 0.0f;
                 stopTimer();
             }
             repaint();
         }
 
         bool mini, started = false, fader = false;
-        float shown = 0.0f, velocity = 0.0f;
+        float shown = 0.0f, velocity = 0.0f, tilt = 0.0f, play = 0.0f, side = 0.0f;
+        int capIndex = 0;
         float squish = 0.0f, squishVelocity = 0.0f, squishTarget = 0.0f;
         juce::Point<float> dent;
     };
@@ -177,7 +201,7 @@ namespace
         {
             if (slider.isFader())
             {
-                slider.setBounds (r.withSizeKeepingCentre (44, r.getHeight()).withTrimmedBottom (2));
+                slider.setBounds (r.withSizeKeepingCentre (juce::jmin (64, r.getWidth()), r.getHeight()).withTrimmedBottom (2));
                 return;
             }
             const int size = juce::jmin (r.getWidth(), r.getHeight() - 18, knobSize);
@@ -256,19 +280,31 @@ namespace
             const auto& th = lookOf (*this).getTheme();
             const bool on = getToggleState();
             const float press = on ? 3.0f : down ? 4.0f : highlighted ? 1.0f : 0.0f;
-            const float rad = th.faders() ? 3.0f : 16.0f;
-            const auto led1980 = juce::Colour (0xffff3b24);
-            const auto ledColour = th.faders() ? led1980 : th.accent;
+            const float rad = th.faders() ? 4.0f : 16.0f;
+            const auto ledColour = th.accent;
             auto r = getLocalBounds().toFloat().reduced (2.0f, 1.0f);
             r.removeFromBottom (5.0f);
 
             // Sockel und Schatten
             g.setColour (juce::Colours::black.withAlpha (0.35f));
             g.fillRoundedRectangle (r.translated (0.0f, 6.0f).expanded (0.5f), rad);
-            g.setColour (th.panel.interpolatedWith (th.ink, 0.45f));
+            g.setColour (th.faders() ? juce::Colour (0xff0b0908) : th.panel.interpolatedWith (th.ink, 0.45f));
             g.fillRoundedRectangle (r.translated (0.0f, 5.0f), rad);
 
             auto face = r.translated (0.0f, press);
+            if (th.faders())
+            {
+                // 1970: dunkler Taster mit Glühlampe
+                juce::ColourGradient grad (on ? juce::Colour (0xff24201c) : juce::Colour (0xff2c2823), face.getX(), face.getY(),
+                                           on ? juce::Colour (0xff2e2a25) : juce::Colour (0xff1a1714), face.getX(), face.getBottom(), false);
+                g.setGradientFill (grad);
+                g.fillRoundedRectangle (face, rad);
+                g.setColour (juce::Colour (0xff0b0908));
+                g.drawRoundedRectangle (face, rad, 1.0f);
+                Design::paintLamp (g, juce::Rectangle<float> (13.0f, 13.0f).withCentre ({ face.getX() + 17.0f, face.getCentreY() }), on || (blink && blinkPhase));
+            }
+            else
+            {
             juce::ColourGradient grad (on ? th.panel.interpolatedWith (th.ink, 0.12f) : th.panel.brighter (0.06f),
                                        face.getX(), face.getY(),
                                        on ? th.panel : th.panel.interpolatedWith (th.ink, 0.14f),
@@ -293,6 +329,7 @@ namespace
             }
             g.setColour (lit ? ledColour : th.knobTrack.overlaidWith (ledColour.withAlpha (0.25f)));
             g.fillEllipse (led);
+            }
 
             auto area = face.withTrimmedLeft (32.0f).reduced (4.0f, 6.0f);
             g.setColour (th.ink);
@@ -329,27 +366,29 @@ namespace
         void paint (juce::Graphics& g) override
         {
             const auto& th = lookOf (*this).getTheme();
-            static const juce::Colour stripes[] { juce::Colour (0xffd8382c), juce::Colour (0xfff08a24),
-                                                  juce::Colour (0xfff2c230), juce::Colour (0xff3f86d8) };
+            static const juce::Colour stripes[] { juce::Colour (0xffe8742a), juce::Colour (0xffdba534),
+                                                  juce::Colour (0xff8aa23c), juce::Colour (0xff4f8f9a) };
             int index = 0;
             for (auto& p : panels)
             {
                 const auto r = p.bounds.toFloat();
                 if (th.faders())
                 {
-                    // 1980: aufgedruckter Rahmen, weißes Titelschild mit farbigem Streifen
-                    g.setColour (th.line.withAlpha (0.55f));
-                    g.drawRect (r.reduced (0.5f), 1.0f);
-                    g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
-                    const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), p.title) + 22.0f;
-                    auto plate = juce::Rectangle<float> (r.getX(), r.getY(), juce::jmin (w, r.getWidth()), 22.0f);
-                    g.setColour (th.ink);
-                    g.fillRect (plate);
+                    // 1970: gerundeter Siebdruck-Rahmen, Titel mittig in einem Schild auf der Linie
+                    auto frame = r.reduced (0.75f).withTrimmedTop (10.0f);
+                    g.setColour (juce::Colours::black.withAlpha (0.12f));
+                    g.fillRoundedRectangle (frame, 10.0f);
+                    g.setColour (th.line.withAlpha (0.7f));
+                    g.drawRoundedRectangle (frame, 10.0f, 1.5f);
+                    g.setFont (juce::FontOptions (12.0f, juce::Font::bold).withKerningFactor (0.25f));
+                    const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), p.title) + 28.0f;
+                    auto plate = juce::Rectangle<float> (juce::jmin (w, r.getWidth() - 20.0f), 20.0f).withCentre ({ r.getCentreX(), r.getY() + 10.0f });
+                    g.setColour (th.plate);
+                    g.fillRoundedRectangle (plate, 10.0f);
                     g.setColour (stripes[index % 4]);
-                    g.fillRect (plate.removeFromBottom (3.0f));
-                    g.setColour (th.body);
-                    g.drawText (p.title, juce::Rectangle<float> (r.getX() + 10.0f, r.getY() + 1.0f, w - 14.0f, 18.0f),
-                                juce::Justification::centredLeft);
+                    g.drawRoundedRectangle (plate, 10.0f, 1.5f);
+                    g.setColour (th.ink);
+                    g.drawText (p.title, plate, juce::Justification::centred);
                 }
                 else
                 {
@@ -383,7 +422,7 @@ namespace
     };
 
     //==========================================================================
-    // Anzeige wie ein Gerätedisplay: 1980 rote Siebensegment-Ziffern, 2100 blau leuchtende Schrift
+    // Anzeige wie ein Gerätedisplay: 1970 orange Nixie-Röhren, 2100 blau leuchtende Schrift
     class LedDisplay : public juce::Component
     {
     public:
@@ -403,27 +442,36 @@ namespace
             auto r = getLocalBounds().toFloat().reduced (2.0f);
             if (th.faders())
             {
-                g.setColour (juce::Colours::black.withAlpha (0.6f));
-                g.fillRoundedRectangle (r.translated (0.0f, 1.5f), 3.0f);
-                g.setColour (juce::Colour (0xff0a0505));
-                g.fillRoundedRectangle (r, 3.0f);
-                g.setColour (juce::Colour (0xff3a3b40));
-                g.drawRoundedRectangle (r, 3.0f, 1.5f);
-                auto inner = r.reduced (12.0f, 6.0f);
+                // 1970: Nixie-Röhren hinter dunklem Glas mit Gitter
+                g.setColour (juce::Colour (0xff0b0908));
+                g.fillRoundedRectangle (r, 8.0f);
+                auto glass = r.reduced (3.0f);
+                juce::ColourGradient bg (juce::Colour (0xff2a1608), glass.getCentreX(), glass.getY() + glass.getHeight() * 0.4f,
+                                         juce::Colour (0xff0b0603), glass.getRight(), glass.getBottom(), true);
+                g.setGradientFill (bg);
+                g.fillRoundedRectangle (glass, 6.0f);
+                g.setColour (juce::Colours::white.withAlpha (0.03f));
+                for (float x = glass.getX(); x < glass.getRight(); x += 3.0f) g.drawVerticalLine ((int) x, glass.getY(), glass.getBottom());
+                for (float y = glass.getY(); y < glass.getBottom(); y += 3.0f) g.drawHorizontalLine ((int) y, glass.getX(), glass.getRight());
+                auto inner = glass.reduced (12.0f, 4.0f);
                 auto top = inner.removeFromTop (inner.getHeight() * 0.66f);
-                const juce::FontOptions digits (juce::Font::getDefaultMonospacedFontName(), top.getHeight() * 0.9f, juce::Font::bold);
+                const juce::FontOptions digits (juce::Font::getDefaultMonospacedFontName(), top.getHeight() * 0.86f, juce::Font::plain);
                 g.setFont (digits);
-                // nicht leuchtende Segmente schimmern durch
-                g.setColour (juce::Colour (0xff2a0806));
+                // die nicht leuchtenden Ziffern stehen dunkel in der Röhre
+                g.setColour (juce::Colour (0xff3a2210));
                 juce::String ghost;
                 for (auto ch : bigText)
-                    ghost << (juce::CharacterFunctions::isDigit (ch) ? juce::juce_wchar ('8') : juce::juce_wchar (' '));
+                    ghost << (juce::CharacterFunctions::isDigit (ch) ? juce::juce_wchar ('8') : ch);
                 g.drawText (ghost, top, juce::Justification::centredLeft);
-                g.setColour (juce::Colour (0x55ff2a14));
-                g.drawText (bigText, top.translated (0.0f, 0.5f).expanded (1.0f), juce::Justification::centredLeft);
-                g.setColour (juce::Colour (0xffff3b24));
+                for (auto [d, a] : { std::pair<float, float> { 3.0f, 0.10f }, { 2.0f, 0.18f }, { 1.0f, 0.3f } })
+                {
+                    g.setColour (juce::Colour (0xffff7a1a).withAlpha (a));
+                    for (auto o : { juce::Point<float> (-d, 0.0f), { d, 0.0f }, { 0.0f, -d }, { 0.0f, d } })
+                        g.drawText (bigText, top + o, juce::Justification::centredLeft);
+                }
+                g.setColour (juce::Colour (0xffff9a3c));
                 g.drawText (bigText, top, juce::Justification::centredLeft);
-                g.setColour (juce::Colour (0xffd8402a));
+                g.setColour (juce::Colour (0xffe07b2e));
                 g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::bold));
                 g.drawText (smallText, inner, juce::Justification::centredLeft);
             }
@@ -459,6 +507,14 @@ namespace
                 levels = { a, b };
                 repaint();
             }
+            // träger Zeiger der Zeigerinstrumente (1970)
+            for (int c = 0; c < 2; ++c)
+            {
+                needleVel[(size_t) c] = needleVel[(size_t) c] * 0.55f + (levels[(size_t) c] - needle[(size_t) c]) * 0.3f;
+                needle[(size_t) c] += needleVel[(size_t) c];
+            }
+            if (std::abs (needleVel[0]) + std::abs (needleVel[1]) > 0.002f)
+                repaint();
         }
 
         void paint (juce::Graphics& g) override
@@ -466,6 +522,42 @@ namespace
             const auto& th = lookOf (*this).getTheme();
             auto r = getLocalBounds().toFloat();
             const char* names[] { "L", "R" };
+            if (th.faders())
+            {
+                // 1970: zwei Zeigerinstrumente übereinander, cremefarbene Skala im Lampenlicht
+                const float h = (r.getHeight() - 4.0f) * 0.5f;
+                for (int c = 0; c < 2; ++c)
+                {
+                    auto face = juce::Rectangle<float> (r.getX() + 2.0f, r.getY() + (h + 4.0f) * (float) c, r.getWidth() - 4.0f, h);
+                    g.setColour (juce::Colour (0xff0b0908));
+                    g.fillRoundedRectangle (face.expanded (1.0f), 4.0f);
+                    juce::ColourGradient bg (juce::Colour (0xfffff1c8), face.getCentreX(), face.getBottom(), juce::Colour (0xffd9c08a), face.getX(), face.getY(), true);
+                    g.setGradientFill (bg);
+                    g.fillRoundedRectangle (face, 3.0f);
+                    const juce::Point<float> pivot { face.getCentreX(), face.getBottom() + 8.0f };
+                    const float rad = face.getHeight() - 2.0f;
+                    for (int t = 0; t <= 10; ++t)
+                    {
+                        const float a = -0.8f + 1.6f * (float) t / 10.0f;
+                        g.setColour (t >= 8 ? juce::Colour (0xffb8321c) : juce::Colour (0xff2a2016));
+                        g.drawLine ({ pivot.getPointOnCircumference (rad - 4.0f, a), pivot.getPointOnCircumference (rad - 9.0f, a) }, 1.0f);
+                    }
+                    juce::Path red;
+                    red.addCentredArc (pivot.x, pivot.y, rad - 4.0f, rad - 4.0f, 0.0f, 0.48f, 0.8f, true);
+                    g.setColour (juce::Colour (0xffb8321c));
+                    g.strokePath (red, juce::PathStrokeType (2.0f));
+                    g.setColour (juce::Colour (0xff2a2016));
+                    g.setFont (juce::FontOptions (7.5f, juce::Font::bold));
+                    g.drawText (names[c], face.reduced (4.0f, 2.0f), juce::Justification::bottomLeft);
+                    g.drawText ("VU", face.reduced (4.0f, 2.0f), juce::Justification::bottomRight);
+                    const float a = -0.8f + 1.6f * juce::jlimit (0.0f, 1.05f, needle[(size_t) c]);
+                    juce::Graphics::ScopedSaveState clip (g);
+                    g.reduceClipRegion (face.toNearestInt());
+                    g.setColour (juce::Colour (0xff1a120a));
+                    g.drawLine ({ pivot, pivot.getPointOnCircumference (rad - 2.0f, a) }, 1.3f);
+                }
+                return;
+            }
             const float colW = r.getWidth() / 2.0f;
             for (int c = 0; c < 2; ++c)
             {
@@ -475,9 +567,9 @@ namespace
                 g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.1f));
                 g.drawText (names[c], label, juce::Justification::centred);
                 col.removeFromBottom (4.0f);
-                if (th.faders())
+                if (false)
                 {
-                    // LED-Kette: grün, gelb, rot
+                    // (früher: LED-Kette)
                     const int segs = 12;
                     const float segH = col.getHeight() / (float) segs;
                     for (int i = 0; i < segs; ++i)
@@ -501,7 +593,7 @@ namespace
         }
 
     private:
-        std::array<float, 2> levels {};
+        std::array<float, 2> levels {}, needle {}, needleVel {};
     };
 
     //==========================================================================
@@ -516,26 +608,27 @@ namespace
         {
             const auto& th = lookOf (*this).getTheme();
             const bool on = getToggleState() || down;
-            const float rad = th.faders() ? 3.0f : 20.0f;
-            const auto led = th.faders() ? juce::Colour (0xffff3b24) : th.accent;
+            const float rad = th.faders() ? 6.0f : 20.0f;
+            const auto led = th.accent;
             auto r = getLocalBounds().toFloat().reduced (2.0f, 1.0f);
             r.removeFromBottom (6.0f);
 
             g.setColour (juce::Colours::black.withAlpha (0.35f));
             g.fillRoundedRectangle (r.translated (0.0f, 7.0f).expanded (0.5f), rad);
-            g.setColour (th.panel.interpolatedWith (th.ink, 0.45f));
+            g.setColour (th.faders() ? juce::Colour (0xff0b0908) : th.panel.interpolatedWith (th.ink, 0.45f));
             g.fillRoundedRectangle (r.translated (0.0f, 6.0f), rad);
 
             auto face = r.translated (0.0f, on ? 4.0f : highlighted ? 1.0f : 0.0f);
             if (th.faders())
             {
-                // 1980: farbige Gummitaste wie bei den Drumcomputern
-                const auto cap = colour1980.withMultipliedBrightness (on ? 1.15f : 0.9f);
-                juce::ColourGradient grad (cap.brighter (0.25f), face.getX(), face.getY(), cap.darker (0.35f), face.getX(), face.getBottom(), false);
+                // 1970: große farbige Taste mit schwarzem Rand
+                const auto cap = colour1970.withMultipliedBrightness (on ? 1.1f : 1.0f);
+                juce::ColourGradient grad (cap.brighter (0.3f), face.getX(), face.getY(), cap.darker (0.35f), face.getX(), face.getBottom(), false);
+                grad.addColour (0.3, cap);
                 g.setGradientFill (grad);
                 g.fillRoundedRectangle (face, rad);
-                g.setColour (juce::Colours::black.withAlpha (0.5f));
-                g.drawRoundedRectangle (face, rad, 1.0f);
+                g.setColour (juce::Colour (0xff0b0908));
+                g.drawRoundedRectangle (face, rad, 2.0f);
             }
             else
             {
@@ -550,15 +643,20 @@ namespace
 
             // LED oben rechts
             auto ledR = juce::Rectangle<float> (10.0f, 10.0f).withCentre ({ face.getRight() - 16.0f, face.getY() + 15.0f });
-            if (on)
+            if (th.faders())
+                Design::paintLamp (g, ledR.expanded (1.0f), on);
+            else if (on)
             {
                 g.setColour (led.withAlpha (0.35f));
                 g.fillEllipse (ledR.expanded (5.0f));
             }
-            g.setColour (on ? led : juce::Colours::black.withAlpha (0.35f));
-            g.fillEllipse (ledR);
+            if (! th.faders())
+            {
+                g.setColour (on ? led : juce::Colours::black.withAlpha (0.35f));
+                g.fillEllipse (ledR);
+            }
 
-            const auto textColour = th.faders() ? juce::Colour (0xff141416) : th.ink;
+            const auto textColour = th.faders() ? juce::Colour (0xff1a1208) : th.ink;
             auto area = face.reduced (14.0f, 8.0f);
             g.setColour (textColour);
             g.setFont (juce::FontOptions (big ? 24.0f : 18.0f, juce::Font::bold).withKerningFactor (0.08f));
@@ -569,7 +667,7 @@ namespace
             g.drawText (subtitle, area, juce::Justification::topLeft);
         }
 
-        juce::Colour colour1980 { 0xfff08a24 };
+        juce::Colour colour1970 { 0xffe8742a };
 
     private:
         juce::String subtitle;
@@ -577,12 +675,12 @@ namespace
     };
 
     //==========================================================================
-    // Farben der Abschnitte: 1980 die farbigen Streifen der Geräte, 2100 Blautöne
+    // Farben der Abschnitte: 1970 erdige Töne der Zeit, 2100 Blautöne
     juce::Colour sectionColour (const Design::Theme& th, int type)
     {
         if (th.faders())
         {
-            static const juce::uint32 c[] { 0xff5a6a80, 0xfff08a24, 0xffd8382c, 0xfff2c230, 0xff3f86d8, 0xff7a7c82, 0xffff5a3c, 0xff4a4c52 };
+            static const juce::uint32 c[] { 0xff6b5843, 0xffc98a2e, 0xffe2622a, 0xffdba534, 0xff4f8f9a, 0xff7c7466, 0xfff0803a, 0xff54493c };
             return juce::Colour (c[juce::jlimit (0, 7, type)]);
         }
         static const float a[] { 0.18f, 0.35f, 0.65f, 0.3f, 0.55f, 0.2f, 0.9f, 0.15f };
@@ -641,10 +739,11 @@ namespace
             auto row = r.removeFromTop (22.0f);
             g.setFont (juce::FontOptions (12.0f, juce::Font::bold).withKerningFactor (0.1f));
             Design::drawText (g, th, "STILTREUE", row.removeFromLeft (96.0f), juce::Justification::centredLeft, th.dim);
-            auto bar = row.removeFromLeft (row.getWidth() - 60.0f).withSizeKeepingCentre (row.getWidth() - 60.0f, 8.0f);
+            auto bar = row.removeFromLeft (row.getWidth() - 60.0f);
+            bar = bar.withSizeKeepingCentre (bar.getWidth(), 8.0f);
             g.setColour (th.knobTrack);
             g.fillRoundedRectangle (bar, 4.0f);
-            g.setColour (th.faders() ? juce::Colour (0xffff3b24) : th.accent);
+            g.setColour (th.faders() ? juce::Colour (0xffff9a3c) : th.accent);
             g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * song->typicality), 4.0f);
             g.setColour (th.ink);
             g.drawText (juce::String (juce::roundToInt (song->typicality * 100.0f)) + " %", row, juce::Justification::centredRight);
@@ -661,7 +760,7 @@ namespace
                 const float x1 = strip.getX() + strip.getWidth() * (float) (sec.endBeat() / total);
                 auto cell = juce::Rectangle<float> (x0, strip.getY(), x1 - x0, strip.getHeight()).reduced (1.0f, 0.0f);
                 g.setColour (sectionColour (th, sec.type));
-                g.fillRoundedRectangle (cell, th.faders() ? 1.0f : 6.0f);
+                g.fillRoundedRectangle (cell, th.faders() ? 3.0f : 6.0f);
             }
             r.removeFromTop (8.0f);
 
@@ -762,7 +861,7 @@ namespace
                 const auto pt = handlePoint ((int) i);
                 if (i == 0) curve.startNewSubPath (pt); else curve.lineTo (pt);
             }
-            g.setColour (th.faders() ? juce::Colour (0xffff3b24) : th.accent);
+            g.setColour (th.faders() ? juce::Colour (0xffff9a3c) : th.accent);
             g.strokePath (curve, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
             for (size_t i = 0; i < song->sections.size(); ++i)
             {
@@ -770,14 +869,14 @@ namespace
                 auto dot = juce::Rectangle<float> (12.0f, 12.0f).withCentre (pt);
                 g.setColour (th.panel);
                 g.fillEllipse (dot);
-                g.setColour (th.faders() ? juce::Colour (0xffff3b24) : th.accent);
+                g.setColour (th.faders() ? juce::Colour (0xffff9a3c) : th.accent);
                 if (song->sections[i].overridden) g.fillEllipse (dot.reduced (1.0f));
                 else g.drawEllipse (dot.reduced (1.0f), 2.0f);
             }
 
             // Abspielposition
             const float x = xFor (shownBeat);
-            g.setColour (th.faders() ? juce::Colour (0xffff3b24) : th.accent);
+            g.setColour (th.faders() ? juce::Colour (0xffff9a3c) : th.accent);
             g.fillRect (juce::Rectangle<float> (x - 1.0f, 0.0f, 2.0f, (float) getHeight() - helpH));
             juce::Path tri;
             tri.addTriangle (x - 6.0f, 0.0f, x + 6.0f, 0.0f, x, 8.0f);
@@ -865,7 +964,7 @@ namespace
                 const float x0 = xFor (s.startBeat()), x1 = xFor (s.endBeat());
                 auto cell = juce::Rectangle<float> (x0, 0.0f, x1 - x0, (float) sectionH).reduced (1.0f, 2.0f);
                 g.setColour (sectionColour (th, s.type));
-                g.fillRoundedRectangle (cell, th.faders() ? 1.0f : 8.0f);
+                g.fillRoundedRectangle (cell, th.faders() ? 3.0f : 8.0f);
                 // ganze Spalte zart hinterlegen
                 g.setColour (sectionColour (th, s.type).withMultipliedAlpha (0.12f));
                 g.fillRect (juce::Rectangle<float> (x0 + 1.0f, (float) sectionH, x1 - x0 - 2.0f, (float) getHeight() - sectionH - helpH));
@@ -998,65 +1097,156 @@ namespace
     };
 
     //==========================================================================
-    // Laserharfe: sechs Strahlen, je Spur einer, leuchten mit dem Pegel
+    // Laserharfe als Punktmatrix: dunkles Raster, jede Spur ein Strahl aus Lichtpunkten in eigener Farbe,
+    // jede gespielte Note blitzt als Punkt auf ihrem Strahl auf (hohe Töne weiter außen), Punkte glimmen nach
     class LaserHarp : public juce::Component
     {
     public:
-        explicit LaserHarp (JarreMachineProcessor& p) : processor (p) {}
+        explicit LaserHarp (JarreMachineProcessor& p) : processor (p)
+        {
+            setOpaque (false);
+            for (int i = 0; i < Jarre::numLanes; ++i)
+                seen[(size_t) i] = processor.engine.hitCount[(size_t) i].load();
+        }
+
+        static constexpr float pitchStep = 6.0f;
+
+        void resized() override
+        {
+            cols = juce::jmax (1, (int) ((float) getWidth() / pitchStep));
+            rows = juce::jmax (1, (int) (((float) getHeight() - 30.0f) / pitchStep));
+            light.assign ((size_t) (cols * rows), 0.0f);
+            owner.assign ((size_t) (cols * rows), 0);
+            grid = {};
+        }
 
         void refresh()
         {
-            bool changed = false;
+            if (light.empty()) return;
+            for (auto& v : light) v *= 0.66f;
+            float total = 0.0f;
+            const float bc = (float) (cols - 1) * 0.5f, br = (float) rows - 2.0f;
             for (int i = 0; i < Jarre::numLanes; ++i)
             {
                 const float v = juce::jlimit (0.0f, 1.0f, std::sqrt (processor.engine.laneLevel[(size_t) i].load() * 2.5f));
-                const float smoothed = shown[(size_t) i] * 0.6f + v * 0.4f;
-                if (std::abs (smoothed - shown[(size_t) i]) > 0.003f) changed = true;
-                shown[(size_t) i] = smoothed;
+                shown[(size_t) i] = shown[(size_t) i] * 0.5f + v * 0.5f;
+                total += shown[(size_t) i];
+                const float lvl = shown[(size_t) i];
+                if (lvl > 0.02f)
+                {
+                    const float a = angle (i), len = reach (i, bc, br) * (0.35f + 0.65f * lvl);
+                    for (float d = 1.0f; d < len; d += 0.5f)
+                        add (bc + std::sin (a) * d, br - std::cos (a) * d, 0.14f * lvl * (1.0f - 0.5f * d / len), i);
+                    add (bc + std::sin (a) * len, br - std::cos (a) * len, 0.55f * lvl, i);
+                }
+                // neue Noten seit dem letzten Bild
+                const int count = processor.engine.hitCount[(size_t) i].load();
+                const int fresh = juce::jlimit (0, 4, count - seen[(size_t) i]);
+                seen[(size_t) i] = count;
+                for (int k = 0; k < fresh; ++k)
+                {
+                    const float fr = 0.3f + 0.62f * juce::jlimit (0.0f, 1.0f, ((float) processor.engine.hitPitch[(size_t) i].load() - 28.0f) / 64.0f);
+                    const float d = reach (i, bc, br) * fr + (float) k * 1.5f, a = angle (i);
+                    const float c = bc + std::sin (a) * d, r = br - std::cos (a) * d;
+                    add (c, r, 1.1f, i);
+                    for (auto o : { juce::Point<float> (1.0f, 0.0f), { -1.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, -1.0f } })
+                        add (c + o.x, r + o.y, 0.4f, i);
+                    for (int s = 0; s < 3; ++s)
+                        add (c + (rng.nextFloat() - 0.5f) * 8.0f, r + (rng.nextFloat() - 0.5f) * 8.0f, 0.25f * rng.nextFloat(), i);
+                }
             }
-            if (changed) repaint();
+            if (processor.shownPlaying.load())
+                for (int s = 0; s < juce::roundToInt (total * 3.0f); ++s)
+                    if (rng.nextFloat() < 0.5f)
+                        add (rng.nextFloat() * (float) cols, rng.nextFloat() * (float) rows * 0.8f, 0.18f + 0.2f * rng.nextFloat(), rng.nextInt (Jarre::numLanes));
+            add (bc, br, 0.6f + 0.4f * juce::jmin (1.0f, total * 0.5f), Jarre::numLanes);
+            repaint();
         }
 
         void paint (juce::Graphics& g) override
         {
             const auto& th = lookOf (*this).getTheme();
+            const bool retro = th.faders();
             auto r = getLocalBounds().toFloat();
-            if (th.faders())
+            g.setColour (retro ? juce::Colour (0xff070504) : juce::Colour (0xff070a12));
+            g.fillRoundedRectangle (r, retro ? 8.0f : 14.0f);
+
+            const float ox = (r.getWidth() - (float) (cols - 1) * pitchStep) * 0.5f;
+            const float oy = ((r.getHeight() - 30.0f) - (float) (rows - 1) * pitchStep) * 0.5f + 2.0f;
+
+            // ruhendes Raster einmal vorzeichnen
+            if (! grid.isValid() || gridRetro != retro)
             {
-                g.setColour (juce::Colour (0xff070809));
-                g.fillRoundedRectangle (r, 3.0f);
+                gridRetro = retro;
+                grid = juce::Image (juce::Image::ARGB, getWidth(), getHeight(), true);
+                juce::Graphics gg (grid);
+                gg.setColour (retro ? juce::Colour (0x14ffab3d) : juce::Colour (0x148cb4ff));
+                for (int y = 0; y < rows; ++y)
+                    for (int x = 0; x < cols; ++x)
+                        gg.fillRect (ox + (float) x * pitchStep - 0.75f, oy + (float) y * pitchStep - 0.75f, 1.5f, 1.5f);
             }
-            const juce::Point<float> base { r.getCentreX(), r.getBottom() - 30.0f };
-            const auto beam = th.faders() ? juce::Colour (0xff39ff6a) : th.accent;
+            g.drawImageAt (grid, 0, 0);
+
+            for (int y = 0; y < rows; ++y)
+                for (int x = 0; x < cols; ++x)
+                {
+                    const float b = light[(size_t) (y * cols + x)];
+                    if (b < 0.04f) continue;
+                    const float w = juce::jmin (1.0f, b), px = ox + (float) x * pitchStep, py = oy + (float) y * pitchStep;
+                    const auto col = laneColour (owner[(size_t) (y * cols + x)]);
+                    if (b > 0.35f)
+                    {
+                        g.setColour (col.withAlpha (0.12f * w));
+                        g.fillEllipse (px - 5.5f, py - 5.5f, 11.0f, 11.0f);
+                    }
+                    const float hot = juce::jmax (0.0f, b - 0.9f) * 2.0f;
+                    g.setColour (col.interpolatedWith (juce::Colours::white, juce::jmin (1.0f, hot)).withAlpha (0.25f + 0.75f * w));
+                    const float rad = 0.9f + 1.5f * w;
+                    g.fillRect (px - rad, py - rad, rad * 2.0f, rad * 2.0f);
+                }
+
+            // Spurnamen als kleine Leuchtschrift in ihrer Farbe
+            g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 9.5f, juce::Font::bold));
             for (int i = 0; i < Jarre::numLanes; ++i)
             {
-                const float angle = juce::degreesToRadians (-48.0f + 96.0f * (float) i / (float) (Jarre::numLanes - 1));
-                const float reach = juce::jmin (r.getHeight() - 60.0f, (r.getWidth() * 0.5f - 40.0f) / juce::jmax (0.1f, std::abs (std::sin (angle))));
-                const float len = reach * (0.25f + 0.75f * shown[(size_t) i]);
-                const auto tip = base + juce::Point<float> (std::sin (angle), -std::cos (angle)) * len;
-                const float glow = 0.15f + 0.85f * shown[(size_t) i];
-                for (float wdt : { 14.0f, 7.0f })
-                {
-                    g.setColour (beam.withAlpha (0.08f * glow));
-                    g.drawLine ({ base, tip }, wdt);
-                }
-                g.setColour (beam.withAlpha (0.35f + 0.65f * glow));
-                g.drawLine ({ base, tip }, 2.2f);
-                g.setColour (beam.withAlpha (glow));
-                g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (tip));
-                g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.1f));
-                g.setColour (th.faders() ? beam.withAlpha (0.8f) : th.dim);
-                auto label = juce::Rectangle<float> (80.0f, 14.0f).withCentre (tip + juce::Point<float> (0.0f, -12.0f));
-                label.setX (juce::jlimit (r.getX() + 4.0f, r.getRight() - 84.0f, label.getX()));
-                g.drawText (Jarre::upper (Jarre::laneName (i)), label, juce::Justification::centred);
+                const float x = 30.0f + (float) i * (r.getWidth() - 60.0f) / (float) (Jarre::numLanes - 1);
+                g.setColour (laneColour (i).withAlpha (0.3f + 0.7f * shown[(size_t) i]));
+                g.drawText (Jarre::upper (Jarre::laneName (i)), juce::Rectangle<float> (80.0f, 14.0f).withCentre ({ x, r.getBottom() - 14.0f }), juce::Justification::centred);
             }
-            g.setColour (th.faders() ? juce::Colour (0xff8c8e93) : th.knob);
-            g.fillRoundedRectangle (juce::Rectangle<float> (70.0f, 16.0f).withCentre (base + juce::Point<float> (0.0f, 10.0f)), 4.0f);
+        }
+
+        static juce::Colour laneColour (int lane)
+        {
+            static const juce::uint32 c[] { 0xffb06bff, 0xff2ee6ff, 0xffff3b4e, 0xff39ff6a, 0xffffc23a, 0xffff4fd8, 0xffffffff };
+            return juce::Colour (c[juce::jlimit (0, 6, lane)]);
         }
 
     private:
+        static float angle (int i) { return juce::degreesToRadians (-50.0f + 100.0f * (float) i / (float) (Jarre::numLanes - 1)); }
+        static float reach (int i, float bc, float br)
+        {
+            return juce::jmin (br - 3.0f, (bc - 3.0f) / juce::jmax (0.1f, std::abs (std::sin (angle (i)))));
+        }
+
+        // Punkt aufhellen; er nimmt die Farbe der Spur an, die ihn am stärksten anstrahlt
+        void add (float c, float r, float v, int lane)
+        {
+            const int x = juce::roundToInt (c), y = juce::roundToInt (r);
+            if (x < 0 || y < 0 || x >= cols || y >= rows) return;
+            auto& b = light[(size_t) (y * cols + x)];
+            if (v >= b * 0.5f) owner[(size_t) (y * cols + x)] = (juce::uint8) lane;
+            b = juce::jmin (1.4f, b + v);
+        }
+
         JarreMachineProcessor& processor;
         std::array<float, Jarre::numLanes> shown {};
+        std::array<int, Jarre::numLanes> seen {};
+        std::vector<float> light;
+        std::vector<juce::uint8> owner;
+        int cols = 1, rows = 1;
+        juce::Image grid;
+        bool gridRetro = false;
+        juce::Random rng { 7 };
     };
 
     //==========================================================================
@@ -1073,8 +1263,8 @@ namespace
             grain = Design::plasticGrain();
 
             // Design-Umschalter: zwei Taster
-            const char* designTitles[] { "1980", "2100" };
-            const char* designSubs[]   { "Plastik, Schieberegler", "Minimal, Gummipotis" };
+            const char* designTitles[] { "1970", "2100" };
+            const char* designSubs[]   { "Holz, Schieberegler", "Minimal, Gummipotis" };
             for (int i = 0; i < 2; ++i)
             {
                 auto* b = designButtons.add (new TabButton (designTitles[i], designSubs[i], 1002));
@@ -1101,16 +1291,16 @@ namespace
             addAndMakeVisible (display);
             addAndMakeVisible (meter);
 
-            startPad.colour1980 = juce::Colour (0xff4bd04b);
+            startPad.colour1970 = juce::Colour (0xff8aa23c);
             startPad.onClick = [this] { processor.setRunning (! processor.running.load()); timerCallback(); };
             addAndMakeVisible (startPad);
-            homePad.colour1980 = juce::Colour (0xffeeeae0);
+            homePad.colour1970 = juce::Colour (0xffe9dfc6);
             homePad.onClick = [this] { processor.seek (0.0); };
             addAndMakeVisible (homePad);
-            rollPad.colour1980 = juce::Colour (0xffd8382c);
+            rollPad.colour1970 = juce::Colour (0xffe2622a);
             rollPad.onClick = [this] { processor.rollNewTrack(); };
             addAndMakeVisible (rollPad);
-            variationPad.colour1980 = juce::Colour (0xfff2c230);
+            variationPad.colour1970 = juce::Colour (0xffdba534);
             variationPad.onClick = [this] { processor.rollVariation(); };
             addAndMakeVisible (variationPad);
 
@@ -1132,9 +1322,9 @@ namespace
             const auto& th = look.getTheme();
             if (th.faders())
             {
-                g.setColour (th.ink);
-                g.setFont (juce::FontOptions (32.0f, juce::Font::bold | juce::Font::italic).withKerningFactor (0.12f));
-                g.drawText ("JARRE MACHINE", 20, 12, 340, 38, juce::Justification::centredLeft);
+                g.setColour (th.accent);
+                g.setFont (juce::FontOptions (32.0f, juce::Font::bold).withKerningFactor (0.1f));
+                g.drawText ("JARRE MACHINE", 24, 12, 340, 38, juce::Justification::centredLeft);
                 g.setColour (th.accent);
                 g.setFont (juce::FontOptions (13.0f, juce::Font::bold).withKerningFactor (0.15f));
                 g.drawText ("SPACE TRACK GENERATOR " + versionLabel(), 366, 14, 320, 18, juce::Justification::centredLeft);
@@ -1410,25 +1600,37 @@ namespace
             const auto r = getLocalBounds().toFloat();
             if (th.faders())
             {
-                g.fillAll (th.body);
+                // 1970: Nussbaumrahmen, schwarze Frontplatte mit vier Schrauben, Transportleiste als eingelassenes Feld
+                Design::paintWood (g, r);
+                const auto plate = r.reduced (6.0f);
+                g.setColour (juce::Colour (0xff0c0a08));
+                g.fillRoundedRectangle (plate.expanded (1.5f), 7.0f);
+                g.setColour (th.plate);
+                g.fillRoundedRectangle (plate, 6.0f);
                 g.setTiledImageFill (grain, 0, 0, 1.0f);
-                g.fillAll();
-                juce::ColourGradient shade (juce::Colours::white.withAlpha (0.05f), 0.0f, 0.0f,
-                                            juce::Colours::black.withAlpha (0.15f), 0.0f, r.getBottom(), false);
-                g.setGradientFill (shade);
-                g.fillAll();
-            }
-            else
-            {
-                juce::ColourGradient light (juce::Colour (0xfffbfcfd), r.getCentreX(), 0.0f,
-                                            th.body, r.getCentreX(), r.getHeight() * 0.7f, true);
-                g.setGradientFill (light);
-                g.fillAll();
+                g.fillRoundedRectangle (plate, 6.0f);
+                for (auto p : { juce::Point<float> (15.0f, 15.0f), { r.getRight() - 15.0f, 15.0f }, { 15.0f, r.getBottom() - 15.0f }, { r.getRight() - 15.0f, r.getBottom() - 15.0f } })
+                {
+                    juce::ColourGradient screw (juce::Colour (0xffd8d2c4), p.x - 2.0f, p.y - 2.0f, juce::Colour (0xff3a3732), p.x + 4.5f, p.y + 4.5f, true);
+                    g.setGradientFill (screw);
+                    g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (p));
+                    g.setColour (juce::Colour (0xff2a2622));
+                    g.drawLine (p.x - 3.0f, p.y + 1.0f, p.x + 3.0f, p.y - 1.0f, 1.2f);
+                }
+                auto deck = juce::Rectangle<float> (24.0f, (float) getHeight() - 124.0f, (float) getWidth() - 48.0f, 112.0f);
+                g.setColour (juce::Colour (0xff15120f));
+                g.fillRoundedRectangle (deck, 8.0f);
+                g.setColour (th.line.withAlpha (0.35f));
+                g.drawRoundedRectangle (deck, 8.0f, 1.5f);
+                return;
             }
 
-            g.setColour (th.faders() ? juce::Colour (0xff121315) : juce::Colour (0xffdde1e6));
-            g.fillRoundedRectangle (juce::Rectangle<float> (12.0f, (float) getHeight() - 124.0f, (float) getWidth() - 24.0f, 116.0f),
-                                    th.faders() ? 3.0f : 18.0f);
+            juce::ColourGradient light (juce::Colour (0xfffbfcfd), r.getCentreX(), 0.0f,
+                                        th.body, r.getCentreX(), r.getHeight() * 0.7f, true);
+            g.setGradientFill (light);
+            g.fillAll();
+            g.setColour (juce::Colour (0xffdde1e6));
+            g.fillRoundedRectangle (juce::Rectangle<float> (12.0f, (float) getHeight() - 124.0f, (float) getWidth() - 24.0f, 116.0f), 18.0f);
         }
 
         void timerCallback() override
@@ -1618,21 +1820,41 @@ void TrendyLook::drawButtonBackground (juce::Graphics& g, juce::Button& b, const
     g.drawRoundedRectangle (r.translated (0.0f, press), rad, 1.0f);
 }
 
-void TrendyLook::drawFader (juce::Graphics& g, juce::Rectangle<float> area, float pos, bool bipolar, bool horizontal, float squish)
+void TrendyLook::drawFader (juce::Graphics& g, juce::Rectangle<float> area, float pos, bool bipolar, bool horizontal, float squish,
+                            float tilt, float side, int capIndex)
 {
-    pos = juce::jlimit (0.0f, 1.0f, pos);
+    // 1970: Schlitz in der Frontplatte, cremefarbener Siebdruck, farbige Kappe mit Spiel (kippt und versetzt sich etwas)
+    pos = juce::jlimit (-0.03f, 1.03f, pos);
     const float indent = (float) faderIndent;
-    const auto printed = theme.ink.withAlpha (0.8f);
-    const auto cap1980 = [&] (juce::Rectangle<float> cap)
+    const auto printed = theme.ink;
+    static const juce::uint32 caps[] { 0xffe9dfc6, 0xffe8742a, 0xff2a2622, 0xffdba534, 0xff4f8f9a, 0xffe9dfc6, 0xffc7432a };
+    const auto capColour = juce::Colour (caps[(size_t) (capIndex % 7)]);
+    const auto drawCap = [&] (juce::Rectangle<float> cap, juce::Point<float> centre, bool vertical)
     {
+        juce::Graphics::ScopedSaveState state (g);
+        g.addTransform (juce::AffineTransform::rotation (tilt, centre.x, centre.y).translated (vertical ? side : 0.0f, vertical ? 0.0f : side * 0.5f));
         g.setColour (juce::Colours::black.withAlpha (0.55f));
-        g.fillRoundedRectangle (cap.translated (0.0f, 3.0f), 2.0f);
-        juce::ColourGradient grad (juce::Colour (0xff46474c), cap.getX(), cap.getY(), juce::Colour (0xff0d0e10), cap.getX(), cap.getBottom(), false);
-        grad.addColour (0.4, juce::Colour (0xff232427));
+        g.fillRoundedRectangle (cap.translated (1.0f, 4.0f), 3.0f);
+        g.setColour (juce::Colour (0xff0b0908));
+        g.fillRoundedRectangle (cap.expanded (1.0f), 4.0f);
+        juce::ColourGradient grad (capColour.brighter (0.35f), cap.getX(), cap.getY(), capColour.darker (0.4f), cap.getX(), cap.getBottom(), false);
+        grad.addColour (0.45, capColour);
         g.setGradientFill (grad);
-        g.fillRoundedRectangle (cap, 2.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.22f));
-        g.drawLine (cap.getX() + 2.0f, cap.getY() + 0.8f, cap.getRight() - 2.0f, cap.getY() + 0.8f, 1.0f);
+        g.fillRoundedRectangle (cap, 3.0f);
+        const auto mark = capColour.getPerceivedBrightness() < 0.3f ? printed : juce::Colour (0xff1a1208);
+        g.setColour (juce::Colours::black.withAlpha (0.25f));
+        if (vertical)
+        {
+            g.fillRect (cap.getX() + 3.0f, centre.y - 5.5f, cap.getWidth() - 6.0f, 1.0f);
+            g.fillRect (cap.getX() + 3.0f, centre.y + 4.5f, cap.getWidth() - 6.0f, 1.0f);
+            g.setColour (mark);
+            g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 4.0f, 2.0f));
+        }
+        else
+        {
+            g.setColour (mark);
+            g.fillRect (cap.withSizeKeepingCentre (2.0f, cap.getHeight() - 6.0f));
+        }
     };
 
     if (! horizontal)
@@ -1640,57 +1862,47 @@ void TrendyLook::drawFader (juce::Graphics& g, juce::Rectangle<float> area, floa
         const float cx = area.getCentreX() + 6.0f;
         const float top = area.getY() + indent, bottom = area.getBottom() - indent, len = bottom - top;
 
-        // aufgedruckte Skala: Striche und 10 / 5 / 0
-        g.setColour (printed.withAlpha (0.45f));
+        // Siebdruck-Skala: Striche (lange bei 0, 5, 10) und Ziffern
+        g.setColour (printed.withAlpha (0.55f));
         for (int i = 0; i <= 10; ++i)
         {
-            const float y = bottom - len * (float) i / 10.0f;
-            g.drawLine (cx - 15.0f, y, cx - 10.0f, y, 1.0f);
-            g.drawLine (cx + 10.0f, y, cx + 15.0f, y, 1.0f);
+            const float y = bottom - len * (float) i / 10.0f, w = i % 5 == 0 ? 7.0f : 4.0f;
+            g.drawLine (cx - 10.0f - w, y, cx - 10.0f, y, 1.0f);
+            g.drawLine (cx + 10.0f, y, cx + 10.0f + w, y, 1.0f);
         }
-        g.setColour (printed);
-        g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
+        g.setColour (printed.withAlpha (0.85f));
+        g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 9.5f, juce::Font::plain));
         const char* marks[] { "0", "5", "10" };
         const char* bmarks[] { "-", "0", "+" };
         for (int i = 0; i < 3; ++i)
-            g.drawText (bipolar ? bmarks[i] : marks[i], juce::Rectangle<float> (cx - 32.0f, bottom - len * (float) i * 0.5f - 6.0f, 15.0f, 12.0f),
+            g.drawText (bipolar ? bmarks[i] : marks[i], juce::Rectangle<float> (cx - 34.0f, bottom - len * (float) i * 0.5f - 6.0f, 15.0f, 12.0f),
                         juce::Justification::centredRight);
 
-        // Schlitz und Füllung
-        g.setColour (juce::Colour (0xff070708));
-        g.fillRoundedRectangle (juce::Rectangle<float> (6.0f, len + 8.0f).withCentre ({ cx, (top + bottom) * 0.5f }), 3.0f);
-        const float from = bipolar ? 0.5f : 0.0f;
-        const float ya = bottom - len * juce::jmax (from, pos), yb = bottom - len * juce::jmin (from, pos);
-        g.setColour (theme.accent);
-        g.fillRect (juce::Rectangle<float> (cx - 1.0f, ya, 2.0f, yb - ya));
+        // Schlitz
+        g.setColour (juce::Colour (0xff050403));
+        g.fillRoundedRectangle (juce::Rectangle<float> (5.0f, len + 10.0f).withCentre ({ cx, (top + bottom) * 0.5f }), 2.5f);
+        g.setColour (juce::Colours::white.withAlpha (0.08f));
+        g.drawLine (cx + 3.0f, top - 4.0f, cx + 3.0f, bottom + 4.0f, 1.0f);
 
-        // Kappe: schwarz mit weißem Strich, gibt beim Drücken etwas nach
         const float y = bottom - len * pos;
-        auto cap = juce::Rectangle<float> (30.0f * (1.0f - 0.05f * squish), 17.0f * (1.0f - 0.1f * squish)).withCentre ({ cx, y });
-        cap1980 (cap);
-        g.setColour (juce::Colour (0xfff1f0ea));
-        g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 6.0f, 2.0f));
+        auto cap = juce::Rectangle<float> (28.0f * (1.0f - 0.05f * squish), 20.0f * (1.0f - 0.1f * squish)).withCentre ({ cx, y });
+        drawCap (cap, { cx, y }, true);
         return;
     }
 
-    // waagerechter Mini-Fader (Matrix, Sequenzer-Reihen)
+    // waagerechter Mini-Fader
     const float cy = area.getCentreY();
     const float left = area.getX() + indent, right = area.getRight() - indent, len = right - left;
-    g.setColour (juce::Colour (0xff070708));
+    g.setColour (juce::Colour (0xff050403));
     g.fillRoundedRectangle (juce::Rectangle<float> (len + 8.0f, 4.0f).withCentre ({ (left + right) * 0.5f, cy }), 2.0f);
     if (bipolar)
     {
         g.setColour (printed.withAlpha (0.5f));
         g.drawLine ((left + right) * 0.5f, cy - 7.0f, (left + right) * 0.5f, cy - 4.0f, 1.0f);
     }
-    const float from = bipolar ? 0.5f : 0.0f;
-    const float xa = left + len * juce::jmin (from, pos), xb = left + len * juce::jmax (from, pos);
-    g.setColour (theme.accent);
-    g.fillRect (juce::Rectangle<float> (xa, cy - 1.0f, xb - xa, 2.0f));
-    auto cap = juce::Rectangle<float> (10.0f, 18.0f * (1.0f - 0.1f * squish)).withCentre ({ left + len * pos, cy });
-    cap1980 (cap);
-    g.setColour (juce::Colour (0xfff1f0ea));
-    g.fillRect (cap.withSizeKeepingCentre (2.0f, cap.getHeight() - 6.0f));
+    const float x = left + len * pos;
+    auto cap = juce::Rectangle<float> (11.0f, 18.0f * (1.0f - 0.1f * squish)).withCentre ({ x, cy });
+    drawCap (cap, { x, cy }, false);
 }
 
 

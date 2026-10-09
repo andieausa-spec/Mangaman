@@ -381,7 +381,7 @@ int main()
                 if (auto* b = find (*editor); b != nullptr && b->onClick) b->onClick();
             }
             auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
-            juce::File file (juce::File (dir).getChildFile ("jarre-machine-" + juce::String (design == 0 ? "1980" : "2100") + "-" + name + ".png"));
+            juce::File file (juce::File (dir).getChildFile ("jarre-machine-" + juce::String (design == 0 ? "1970" : "2100") + "-" + name + ".png"));
             file.deleteFile();
             juce::FileOutputStream stream (file);
             juce::PNGImageFormat().writeImageToStream (image, stream);

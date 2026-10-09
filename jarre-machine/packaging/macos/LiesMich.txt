@@ -1,6 +1,6 @@
 JARRE MACHINE – Installation auf dem Mac
 ========================================
-Space-Track-Generator, Version 0.1 – Andreas Engel, Darmstadt, Deutschland
+Space-Track-Generator, Version 0.2 – Andreas Engel, Darmstadt, Deutschland
 
 1. Doppelklick auf „JARRE MACHINE Installer.pkg“.
 

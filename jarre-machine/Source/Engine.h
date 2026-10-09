@@ -74,6 +74,8 @@ public:
     }
 
     std::array<std::atomic<float>, Jarre::numLanes> laneLevel {};
+    // für die Laser-Punktmatrix: Zähler der angeschlagenen Noten je Spur und Tonhöhe der letzten
+    std::array<std::atomic<int>, Jarre::numLanes> hitCount {}, hitPitch {};
     std::atomic<float> outLevel { 0.0f }, outLevelR { 0.0f };
 
 private:
@@ -109,6 +111,8 @@ private:
     {
         const auto len = (juce::int64) juce::jmax (1.0, e.remaining / beatsPerSample);
         const int pitch = e.note.pitch + c.transpose;
+        hitPitch[(size_t) e.lane].store (e.note.pitch);
+        hitCount[(size_t) e.lane].fetch_add (1);
         switch (e.lane)
         {
             case Jarre::Pad:

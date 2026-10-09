@@ -1,9 +1,9 @@
-# JARRE MACHINE V0.1
+# JARRE MACHINE V0.2
 
 Space-Track-Generator: würfelt komplette Instrumentaltracks im Stil der Synthesizer-Musik der späten Siebziger
 (String-Maschine mit Phaser, sprudelnde Sequenzen, Rhythmusbox, gleitende Melodien, Wind, Brandung, Laser).
 Von Andreas Engel, Darmstadt, Deutschland. Instrument als AU, VST3 und Standalone (JUCE 8, CMake).
-Gestaltung wie TRENDY ANDY: Design-Umschalter 1980 / 2100, Taster-Reiter, Querformat ohne Scrollen.
+Gestaltung wie TRENDY ANDY: Design-Umschalter 1970 / 2100, Taster-Reiter, Querformat ohne Scrollen.
 
 Alles wird nach Stilregeln neu erfunden und synthetisch erzeugt: keine Samples, keine Melodien oder Akkordfolgen aus Originalaufnahmen.
 „Nähe zum Original“ steuert nur, wie oft der Generator zu den typischen Stilmitteln greift.

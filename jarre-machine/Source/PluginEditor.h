@@ -3,7 +3,7 @@
 #include "PluginProcessor.h"
 #include "DesignTheme.h"
 
-// Aussehen nach gewähltem Design (wie TRENDY ANDY): 1980 mit Fadern und Aufdruck, 2100 mit großen Gummipotis und blauer Leuchtschrift
+// Aussehen nach gewähltem Design: 1970 mit Holz, Siebdruck und wackeligen Schiebereglern, 2100 mit großen Gummipotis und blauer Leuchtschrift
 class TrendyLook : public juce::LookAndFeel_V4
 {
 public:
@@ -16,8 +16,9 @@ public:
     void drawRubberKnob (juce::Graphics&, juce::Rectangle<float> area, float pos, float squish,
                          juce::Point<float> dent, bool bipolar, float startAngle, float endAngle, bool mini);
 
-    // Fader im Stil 1980: Schlitz, aufgedruckte Skala, schwarze Kappe mit weißem Strich
-    void drawFader (juce::Graphics&, juce::Rectangle<float> area, float pos, bool bipolar, bool horizontal, float squish);
+    // Fader im Stil 1970: Schlitz, Siebdruck-Skala, farbige Kappe; tilt/side: Spiel der Kappe im Schlitz
+    void drawFader (juce::Graphics&, juce::Rectangle<float> area, float pos, bool bipolar, bool horizontal, float squish,
+                    float tilt = 0.0f, float side = 0.0f, int capIndex = 0);
 
     int getSliderThumbRadius (juce::Slider&) override { return faderIndent; }
     static constexpr int faderIndent = 9;
