@@ -29,7 +29,7 @@ Sie singt erfundene Silben, Lautmalerei oder summt. „Nähe zum Original“ ste
 - **Klang**: Flächen (Streicher, Chor, Klavier), Riff (Säge, Puls, Glocke), Bass, Melodie (Puls, Säge, Glocke, Gitarre), Drumcomputer (5 Kits), Effekte (Schimmer, Anlauf, Orchester-Hit).
 - **Gesang**: Gesang an/aus, Silben (Kunstwörter, Lautmalerei, Summen), Wärme, Hauch, Vibrato, Gleiten, Doppelung, Chorstimme, Hall, Echo, Pegel.
   Darunter die Textzeile mit den gesungenen Silben.
-- **Mischpult**: Pegel, Stumm und Solo der sieben Spuren, Echo im Takt, Hall, Breite, Master, Bühnenlicht.
+- **Mischpult**: Pegel, Stumm und Solo der sieben Spuren, Echo im Takt, Hall, Breite, Master, Bühnenlicht mit tanzender Figur, die in den Farben der Spuren leuchtet.
 
 Immer sichtbar unten: Anzeige, Pegel, START/STOP, ANFANG, GESANG (an/aus), **NEUER SONG** und **VARIATION** (gleiche Form, neue Noten).
 Im Host folgt der Song dem Transport und Tempo des Hosts. MIDI-Tasten rücken den ganzen Song (C3 = Originallage).

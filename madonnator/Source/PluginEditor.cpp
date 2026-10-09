@@ -1125,7 +1125,10 @@ namespace
     };
 
     //==========================================================================
-    // Bühnenlicht: sieben Scheinwerfer, je Spur einer, leuchten mit dem Pegel
+    // Bühnenlicht: eine stilisierte Tänzerin. Jede Spur färbt und beleuchtet
+    // einen Körperteil (Flächen = Aura, Riff = linker Arm, Bass = Bühnenboden,
+    // Melodie = rechter Arm, Gesang = Kopf und Headset, Rhythmus = Beine und
+    // Tanzschwung, Effekte = Funken). Die Pose wechselt im Takt des Songs.
     class StageLights : public juce::Component
     {
     public:
@@ -1133,58 +1136,267 @@ namespace
 
         void refresh()
         {
-            bool changed = false;
             for (int i = 0; i < Mdn::numLanes; ++i)
             {
                 const float v = juce::jlimit (0.0f, 1.0f, std::sqrt (processor.engine.laneLevel[(size_t) i].load() * 2.5f));
-                const float smoothed = shown[(size_t) i] * 0.6f + v * 0.4f;
-                if (std::abs (smoothed - shown[(size_t) i]) > 0.003f) changed = true;
-                shown[(size_t) i] = smoothed;
+                shown[(size_t) i] = shown[(size_t) i] * 0.6f + v * 0.4f;
             }
-            if (changed) repaint();
+            const double beat = processor.shownBeat.load();
+            const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+            if (std::abs (beat - lastBeat) > 1.0e-4) { lastBeat = beat; lastMove = now; }
+            const float target = (now - lastMove < 0.4) ? 1.0f : 0.0f;
+            playing = target > playing ? target : playing + (target - playing) * 0.1f;
+            repaint();
+        }
+
+    private:
+        struct Pose { float hipX, lean, head, luA, llA, ruA, rlA, ltA, lsA, rtA, rsA; };
+
+        static Pose mix (const Pose& a, const Pose& b, float t)
+        {
+            auto l = [t] (float x, float y) { return x + (y - x) * t; };
+            return { l (a.hipX, b.hipX), l (a.lean, b.lean), l (a.head, b.head), l (a.luA, b.luA), l (a.llA, b.llA),
+                     l (a.ruA, b.ruA), l (a.rlA, b.rlA), l (a.ltA, b.ltA), l (a.lsA, b.lsA), l (a.rtA, b.rtA), l (a.rsA, b.rsA) };
+        }
+
+        static Pose danceAt (double beat)
+        {
+            // Acht Posen je zwei Takte: Hand an der Hüfte, Rahmen ums Gesicht,
+            // Zeigen, beide Arme hoch, ... Winkel in Grad, 0 = senkrecht nach unten.
+            static const Pose poses[] {
+                {  0.30f, -6.0f,  8.0f,  -40.0f,   40.0f,  160.0f,  190.0f,  -8.0f,  -4.0f,  14.0f,  -6.0f },
+                { -0.30f,  6.0f, -6.0f, -120.0f,   80.0f,  120.0f,  -80.0f, -14.0f,   6.0f,   8.0f,   4.0f },
+                {  0.35f, -4.0f, 10.0f, -100.0f,  -95.0f,   30.0f,  -20.0f,   4.0f,   2.0f,  24.0f, -10.0f },
+                { -0.20f,  0.0f,  0.0f, -165.0f, -175.0f,  165.0f,  175.0f, -10.0f,   0.0f,  10.0f,   0.0f },
+                { -0.35f,  5.0f, -9.0f, -160.0f, -190.0f,   40.0f,  -40.0f, -24.0f,  10.0f,  -4.0f,  -2.0f },
+                {  0.25f, -5.0f,  6.0f,  -60.0f,  -10.0f,  100.0f,   95.0f,  -6.0f,  -2.0f,  16.0f,  -4.0f },
+                { -0.25f,  8.0f, -4.0f, -135.0f,  -60.0f,  135.0f,   60.0f, -18.0f,   4.0f,  12.0f,   8.0f },
+                {  0.20f, -3.0f,  4.0f,  -20.0f,  -50.0f,  -20.0f,   50.0f,  -4.0f,   0.0f,   4.0f,   0.0f },
+            };
+            const double b = std::max (0.0, beat);
+            const int i = (int) std::floor (b) % 8;
+            const float t = (float) (b - std::floor (b));
+            const float e = juce::jlimit (0.0f, 1.0f, t / 0.22f);
+            return mix (poses[(i + 7) % 8], poses[i], e * e * (3.0f - 2.0f * e));
         }
 
         void paint (juce::Graphics& g) override
         {
             const auto& th = lookOf (*this).getTheme();
+            const bool retro = th.faders();
             auto r = getLocalBounds().toFloat();
-            if (th.faders())
+            g.setColour (retro ? juce::Colour (0xff070809) : juce::Colour (0xff0b1430));
+            g.fillRoundedRectangle (r, 3.0f);
+
+            static const juce::uint32 gels[] { 0xffb04cf0, 0xff39d0c0, 0xff3f86d8, 0xfff2c230, 0xffff4fa0, 0xffd8382c, 0xffffffff };
+            auto gel = [&] (int lane)
             {
-                g.setColour (juce::Colour (0xff070809));
-                g.fillRoundedRectangle (r, 3.0f);
+                const auto c = juce::Colour (gels[lane]);
+                return retro ? c : c.interpolatedWith (th.accent, 0.15f);
+            };
+            auto lit = [&] (int lane) { return 0.18f + 0.82f * shown[(size_t) lane]; };
+
+            const float floorY = r.getBottom() - 30.0f;
+            const float u = (floorY - r.getY() - 6.0f) / 10.0f;
+            const float cx = r.getCentreX();
+            const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+
+            // Pose: im Lauf tanzt sie zum Takt, im Stand wiegt sie sich leicht.
+            const float drive = 0.35f + 0.65f * shown[5];
+            const float idleSway = (float) std::sin (now * 1.4);
+            const Pose idle { 0.15f * idleSway, 3.0f * idleSway, -4.0f * idleSway, -14.0f, -6.0f, 14.0f, 6.0f, -5.0f, 0.0f, 5.0f, 0.0f };
+            const Pose pose = mix (idle, danceAt (lastBeat), playing * drive);
+            const float frac = (float) (lastBeat - std::floor (lastBeat));
+            const float bob = playing * drive * 0.22f * u * std::sin (juce::MathConstants<float>::pi * frac);
+
+            // Mischfarbe aller Spuren für Rumpf und Lichtkegel
+            juce::Colour body (0xff808080);
+            {
+                float wr = 0, wg = 0, wb = 0, ws = 0.05f;
+                for (int i = 0; i < Mdn::numLanes; ++i)
+                {
+                    const auto c = gel (i); const float w = shown[(size_t) i];
+                    wr += c.getFloatRed() * w; wg += c.getFloatGreen() * w; wb += c.getFloatBlue() * w; ws += w;
+                }
+                body = juce::Colour::fromFloatRGBA (wr / ws, wg / ws, wb / ws, 1.0f)
+                           .interpolatedWith (juce::Colour (0xff8a8296), juce::jlimit (0.0f, 1.0f, 1.0f - (ws - 0.05f) * 3.0f));
             }
-            static const juce::uint32 gels[] { 0xff3f86d8, 0xfff2c230, 0xffd8382c, 0xfff08a24, 0xffffffff, 0xff8a5cf0, 0xff39d0c0 };
+            float total = 0.0f;
+            for (auto v : shown) total += v;
+            total = juce::jlimit (0.0f, 1.0f, total / 3.0f);
+
+            // Lichtkegel von oben
+            {
+                juce::Path cone;
+                cone.addTriangle (cx, r.getY(), cx - 3.6f * u, floorY, cx + 3.6f * u, floorY);
+                g.setGradientFill (juce::ColourGradient (body.withAlpha (0.10f + 0.25f * total), cx, r.getY(),
+                                                         body.withAlpha (0.02f), cx, floorY, false));
+                g.fillPath (cone);
+            }
+            // Flächen: Aura hinter der Figur
+            {
+                const auto c = gel (0);
+                const float rad = u * (2.6f + 1.6f * shown[0]);
+                const juce::Point<float> mid (cx + pose.hipX * u, floorY - 6.0f * u);
+                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.55f * lit (0)), mid, c.withAlpha (0.0f), mid.translated (rad, 0), true));
+                g.fillEllipse (juce::Rectangle<float> (rad * 2.0f, rad * 2.6f).withCentre (mid));
+            }
+            // Bass: Bühnenboden
+            {
+                const auto c = gel (2);
+                const float w = u * (3.0f + 2.0f * shown[2]);
+                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.8f * lit (2)), cx, floorY, c.withAlpha (0.0f), cx + w, floorY, true));
+                g.fillEllipse (juce::Rectangle<float> (w * 2.0f, u * 0.9f).withCentre ({ cx, floorY }));
+                g.setColour (c.withAlpha (0.3f + 0.5f * shown[2]));
+                g.drawLine (r.getX() + 8.0f, floorY + 0.5f * u, r.getRight() - 8.0f, floorY + 0.5f * u, 1.0f);
+            }
+
+            // Skelett
+            const float deg = juce::MathConstants<float>::pi / 180.0f;
+            auto dir = [deg] (float a) { return juce::Point<float> (std::sin (a * deg), std::cos (a * deg)); };
+            const float lean = pose.lean;
+            const juce::Point<float> up (std::sin (lean * deg), -std::cos (lean * deg));
+            const juce::Point<float> side (std::cos (lean * deg), std::sin (lean * deg));
+            const float legLen = 2.3f * u;
+            const juce::Point<float> hip (cx + pose.hipX * u, floorY - 2.0f * legLen * 0.97f + bob);
+            const auto neck = hip + up * (3.0f * u);
+            const auto shL = neck - side * (0.72f * u) + up * (-0.12f * u);
+            const auto shR = neck + side * (0.72f * u) + up * (-0.12f * u);
+            const auto hpL = hip - side * (0.42f * u);
+            const auto hpR = hip + side * (0.42f * u);
+            const auto elL = shL + dir (pose.luA + lean) * (1.55f * u);
+            const auto haL = elL + dir (pose.llA + lean) * (1.45f * u);
+            const auto elR = shR + dir (pose.ruA + lean) * (1.55f * u);
+            const auto haR = elR + dir (pose.rlA + lean) * (1.45f * u);
+            const auto knL = hpL + dir (pose.ltA) * legLen;
+            const auto ftL = knL + dir (pose.lsA) * legLen;
+            const auto knR = hpR + dir (pose.rtA) * legLen;
+            const auto ftR = knR + dir (pose.rsA) * legLen;
+
+            auto limb = [&] (std::initializer_list<juce::Point<float>> pts, juce::Colour c, float level, float width)
+            {
+                juce::Path p;
+                bool first = true;
+                for (auto& q : pts) { if (first) p.startNewSubPath (q); else p.lineTo (q); first = false; }
+                g.setColour (c.withAlpha (0.10f + 0.30f * level));
+                g.strokePath (p, juce::PathStrokeType (width * 2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.setColour (c.withMultipliedBrightness (0.35f + 0.65f * level));
+                g.strokePath (p, juce::PathStrokeType (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            };
+
+            // Rhythmus: Beine (mit Stiefeln)
+            const auto legC = gel (5);
+            limb ({ hpL, knL, ftL }, legC, lit (5), 0.34f * u);
+            limb ({ hpR, knR, ftR }, legC, lit (5), 0.34f * u);
+            g.setColour (legC.withMultipliedBrightness (0.3f + 0.6f * lit (5)));
+            g.fillEllipse (juce::Rectangle<float> (0.75f * u, 0.38f * u).withCentre (ftL.translated (-0.15f * u, 0.0f)));
+            g.fillEllipse (juce::Rectangle<float> (0.75f * u, 0.38f * u).withCentre (ftR.translated (0.15f * u, 0.0f)));
+
+            // Rumpf: Sanduhr-Form in der Mischfarbe aller Spuren
+            {
+                const auto waist = hip + up * (1.2f * u);
+                juce::Path torso;
+                torso.startNewSubPath (shL);
+                torso.quadraticTo (waist - side * (0.30f * u) + up * (0.5f * u), waist - side * (0.34f * u));
+                torso.quadraticTo (waist - side * (0.40f * u) - up * (0.6f * u), hpL - side * (0.18f * u));
+                torso.lineTo (hpR + side * (0.18f * u));
+                torso.quadraticTo (waist + side * (0.40f * u) - up * (0.6f * u), waist + side * (0.34f * u));
+                torso.quadraticTo (waist + side * (0.30f * u) + up * (0.5f * u), shR);
+                torso.closeSubPath();
+                g.setColour (body.withAlpha (0.12f + 0.3f * total));
+                g.strokePath (torso, juce::PathStrokeType (0.7f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.setColour (body.withMultipliedBrightness (0.45f + 0.55f * total));
+                g.fillPath (torso);
+                // Gürtel als Akzent
+                g.setColour (retro ? juce::Colour (0xff070809).withAlpha (0.5f) : th.panel.withAlpha (0.5f));
+                g.drawLine (juce::Line<float> (waist - side * (0.36f * u), waist + side * (0.36f * u)), 0.14f * u);
+            }
+
+            // Riff: linker Arm, Melodie: rechter Arm
+            limb ({ shL, elL, haL }, gel (1), lit (1), 0.30f * u);
+            limb ({ shR, elR, haR }, gel (3), lit (3), 0.30f * u);
+            g.setColour (gel (1).withMultipliedBrightness (0.4f + 0.6f * lit (1)));
+            g.fillEllipse (juce::Rectangle<float> (0.36f * u, 0.36f * u).withCentre (haL));
+            g.setColour (gel (3).withMultipliedBrightness (0.4f + 0.6f * lit (3)));
+            g.fillEllipse (juce::Rectangle<float> (0.36f * u, 0.36f * u).withCentre (haR));
+
+            // Gesang: Kopf, Pferdeschwanz und Headset-Mikrofon
+            {
+                const auto vc = gel (4);
+                const float hl = lit (4);
+                const float headTilt = lean + pose.head;
+                const juce::Point<float> hUp (std::sin (headTilt * deg), -std::cos (headTilt * deg));
+                const juce::Point<float> hSide (std::cos (headTilt * deg), std::sin (headTilt * deg));
+                const float hr = 0.55f * u;
+                const auto head = neck + up * (0.25f * u) + hUp * (0.62f * u);
+                g.setColour (vc.withMultipliedBrightness (0.35f + 0.65f * hl));
+                g.drawLine (juce::Line<float> (neck, neck + up * (0.4f * u)), 0.26f * u);
+                // Pferdeschwanz schwingt gegen die Bewegung
+                const float swing = -(pose.hipX * 40.0f + pose.head * 2.0f);
+                const auto tie = head + hUp * (0.45f * u) - hSide * (0.35f * u);
+                const auto tip = tie + dir (swing - 60.0f) * (1.3f * u);
+                juce::Path tail;
+                tail.startNewSubPath (tie);
+                tail.quadraticTo (tie - hSide * (0.9f * u), tip);
+                g.setColour (vc.withAlpha (0.15f + 0.35f * hl));
+                g.strokePath (tail, juce::PathStrokeType (0.75f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.setColour (vc.withMultipliedBrightness (0.4f + 0.6f * hl));
+                g.strokePath (tail, juce::PathStrokeType (0.32f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.setColour (vc.withAlpha (0.12f + 0.4f * hl));
+                g.fillEllipse (juce::Rectangle<float> (hr * 3.4f, hr * 3.4f).withCentre (head));
+                g.setColour (vc.withMultipliedBrightness (0.4f + 0.6f * hl));
+                g.fillEllipse (juce::Rectangle<float> (hr * 2.0f, hr * 2.2f).withCentre (head));
+                // Headset: Bügel vom Ohr zum Mund, Kapsel leuchtet beim Singen
+                const auto ear = head + hSide * (hr * 0.95f);
+                const auto mouth = head + hSide * (hr * 0.55f) - hUp * (hr * 0.75f);
+                juce::Path mic;
+                mic.startNewSubPath (ear);
+                mic.quadraticTo (ear - hUp * (hr * 0.9f) + hSide * (hr * 0.25f), mouth);
+                g.setColour (retro ? juce::Colour (0xff070809) : th.panel);
+                g.strokePath (mic, juce::PathStrokeType (0.11f * u));
+                g.setColour (juce::Colours::white.withAlpha (0.35f + 0.65f * shown[4]));
+                g.fillEllipse (juce::Rectangle<float> (0.22f * u, 0.22f * u).withCentre (mouth));
+            }
+
+            // Effekte: Funken rund um die Tänzerin
+            {
+                const auto fc = gel (6);
+                juce::Random rnd (4711);
+                for (int i = 0; i < 14; ++i)
+                {
+                    const float ax = rnd.nextFloat(), ay = rnd.nextFloat(), ph = rnd.nextFloat() * 6.28f;
+                    const float tw = 0.5f + 0.5f * (float) std::sin (now * (2.0 + 3.0 * ax) + ph);
+                    const float a = shown[6] * tw;
+                    if (a < 0.03f) continue;
+                    const float x = r.getX() + 10.0f + ax * (r.getWidth() - 20.0f);
+                    const float y = r.getY() + 6.0f + ay * (floorY - r.getY() - 12.0f);
+                    if (std::abs (x - cx) < 1.6f * u) continue;
+                    const float s = (0.15f + 0.3f * a) * u;
+                    g.setColour (fc.withAlpha (juce::jmin (1.0f, 0.2f + a)));
+                    g.drawLine (x - s, y, x + s, y, 1.2f);
+                    g.drawLine (x, y - s, x, y + s, 1.2f);
+                }
+            }
+
+            // Legende: Spurname mit Farbpunkt, hell nach Pegel
             const float colW = r.getWidth() / (float) Mdn::numLanes;
-            const float floorY = r.getBottom() - 28.0f;
+            g.setFont (juce::FontOptions (9.5f, juce::Font::bold).withKerningFactor (0.06f));
             for (int i = 0; i < Mdn::numLanes; ++i)
             {
-                const float cx = r.getX() + colW * ((float) i + 0.5f);
-                const float glow = 0.12f + 0.88f * shown[(size_t) i];
-                const auto beam = th.faders() ? juce::Colour (gels[i]) : th.accent;
-                // Lichtkegel von oben auf die Bühne
-                juce::Path cone;
-                const float spread = colW * (0.25f + 0.3f * shown[(size_t) i]);
-                cone.addTriangle (cx, r.getY() + 14.0f, cx - spread, floorY, cx + spread, floorY);
-                juce::ColourGradient grad (beam.withAlpha (0.55f * glow), cx, r.getY() + 14.0f, beam.withAlpha (0.05f * glow), cx, floorY, false);
-                g.setGradientFill (grad);
-                g.fillPath (cone);
-                g.setColour (beam.withAlpha (0.25f * glow));
-                g.fillEllipse (juce::Rectangle<float> (spread * 2.0f, 10.0f).withCentre ({ cx, floorY }));
-                // Scheinwerfer-Gehäuse
-                g.setColour (th.faders() ? juce::Colour (0xff3a3b40) : th.knob);
-                g.fillRoundedRectangle (juce::Rectangle<float> (18.0f, 14.0f).withCentre ({ cx, r.getY() + 10.0f }), 3.0f);
-                g.setColour (beam.withAlpha (glow));
-                g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ cx, r.getY() + 14.0f }));
-                g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.08f));
-                g.setColour (th.faders() ? beam.withAlpha (0.85f) : th.dim);
-                g.drawFittedText (Mdn::upper (Mdn::laneName (i)), juce::Rectangle<float> (cx - colW * 0.5f, floorY + 8.0f, colW, 14.0f).toNearestInt(),
-                                  juce::Justification::centred, 1, 0.7f);
+                const float x0 = r.getX() + colW * (float) i;
+                const auto c = gel (i);
+                g.setColour (c.withAlpha (0.25f + 0.75f * shown[(size_t) i]));
+                g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ x0 + colW * 0.5f, floorY + 13.0f }));
+                g.setColour (retro ? c.withAlpha (0.85f) : th.dim);
+                g.drawFittedText (Mdn::upper (Mdn::laneName (i)), juce::Rectangle<float> (x0, floorY + 17.0f, colW, 12.0f).toNearestInt(),
+                                  juce::Justification::centred, 1, 0.6f);
             }
         }
 
-    private:
         MadonnatorProcessor& processor;
         std::array<float, Mdn::numLanes> shown {};
+        double lastBeat = 0.0, lastMove = -10.0;
+        float playing = 0.0f;
     };
 
     //==========================================================================
