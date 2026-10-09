@@ -67,6 +67,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
           name: TRENDY ANDY ${{ env.VERSION }}
           make_latest: true
           files: |
