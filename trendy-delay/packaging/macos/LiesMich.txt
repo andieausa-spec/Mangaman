@@ -1,0 +1,22 @@
+TRENDY DELAY – Installation auf dem Mac
+=======================================
+Dub-Bandecho, Version 0.1 – Andreas Engel, Darmstadt, Deutschland
+
+1. Doppelklick auf „TRENDY DELAY Installer.pkg“.
+
+   Meldet macOS „kann nicht geöffnet werden, da der Entwickler nicht verifiziert ist“:
+   Systemeinstellungen → Datenschutz & Sicherheit → ganz nach unten scrollen →
+   bei „TRENDY DELAY Installer.pkg wurde blockiert“ auf „Trotzdem öffnen“ klicken.
+   (Der Installer ist nicht mit einer Apple-Developer-ID signiert.)
+
+2. Der Installer legt ab:
+   - AU-Effekt:    /Library/Audio/Plug-Ins/Components/TRENDY DELAY.component  (Logic, GarageBand)
+   - VST3-Effekt:  /Library/Audio/Plug-Ins/VST3/TRENDY DELAY.vst3             (Cubase, Ableton Live, Bitwig …)
+   - Standalone:   /Programme/TRENDY DELAY.app
+
+3. DAW neu starten.
+   Cubase: Insert- oder FX-Kanal → Delay → TRENDY DELAY (Hersteller Andreas Engel).
+   Logic: Audio-FX → Audio Units → Andreas Engel → TRENDY DELAY.
+   Ableton Live: Einstellungen → Plug-ins → „VST3-Plug-in-Systemordner verwenden“ an → „Neu scannen“.
+
+Läuft auf macOS 11 oder neuer, Apple Silicon und Intel.
