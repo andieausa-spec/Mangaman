@@ -1,0 +1,84 @@
+name: MADONNATOR Installer bauen
+
+on:
+  push:
+    paths: ['madonnator/**', '.github/workflows/madonnator.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: madonnator
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version lesen
+        run: echo "VERSION=$(sed -n 's/^project(Madonnator VERSION \([0-9.]*\)).*/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
+      - name: Bauen (Universal Binary)
+        run: |
+          cmake -B build -G Xcode
+          cmake --build build --config Release --parallel
+      - name: DMG erstellen
+        run: bash packaging/macos/make-dmg.sh "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Madonnator-macOS
+          path: madonnator/dist/*.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version lesen
+        shell: bash
+        run: echo "VERSION=$(sed -n 's/^project(Madonnator VERSION \([0-9.]*\)).*/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
+      - name: Bauen (x64, ohne VC-Redistributable)
+        shell: bash
+        run: |
+          cmake -B build -A x64 "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded\$<\$<CONFIG:Debug>:Debug>"
+          cmake --build build --config Release --parallel
+      - name: Inno Setup bereitstellen
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Setup.exe erstellen
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VERSION" "/DBuildDir=$env:GITHUB_WORKSPACE\madonnator\build\Madonnator_artefacts\Release" "/O$env:GITHUB_WORKSPACE\madonnator\dist" packaging\windows\Madonnator.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Madonnator-Windows
+          path: madonnator/dist/*.exe
+
+  release:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version lesen
+        run: echo "VERSION=$(sed -n 's/^project(Madonnator VERSION \([0-9.]*\)).*/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release mit beiden Installern
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: madonnator-v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: MADONNATOR ${{ env.VERSION }}
+          make_latest: false
+          files: |
+            dist/*.dmg
+            dist/*.exe
+          body: |
+            **macOS** (11 oder neuer, Apple Silicon + Intel): `.dmg` öffnen, `MADONNATOR Installer.pkg` starten. Installiert AU, VST3 und die Standalone-App.
+            **Windows** (10/11, 64 Bit): `Setup.exe` starten. Installiert VST3 und die Standalone-App.
+
+            Die Installer sind nicht signiert. macOS: Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“. Windows: „Weitere Informationen“ → „Trotzdem ausführen“.
