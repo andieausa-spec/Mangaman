@@ -1124,6 +1124,7 @@ namespace
                 pages[i]->setVisible (i == index);
                 tabs[i]->setToggleState (i == index, juce::dontSendNotification);
             }
+            timerCallback();   // Anzeigen der neuen Seite sofort auffrischen
         }
 
         // Design anwenden: Farben, Fader oder Drehregler, Anordnung

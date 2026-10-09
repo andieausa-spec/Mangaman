@@ -296,6 +296,49 @@ int main()
             }
         }
         proc.design.store (1);
+
+        // Zusatzbilder fürs Handbuch: drei Köpfe auf dem Laufwerk, Schleife über der Selbstoszillation, ENDLOS und halbes Bandtempo
+        struct Extra { const char* file; const char* tab; std::vector<std::pair<const char*, float>> values; };
+        const std::vector<Extra> extras {
+            { "drei-koepfe", "Band", { { "mode", (float) Params::ThreeHeads } } },
+            { "selbstoszillation", "Echo", { { "feedback", 1.1f }, { "resonance", 0.8f }, { "high_cut", 1800.0f } } },
+            { "endlos-halb", "Dub", { { "freeze", 1.0f }, { "speed", 0.0f } } },
+            { "frei-pingpong", "Echo", { { "sync", 0.0f }, { "mode", (float) Params::PingPong }, { "time", 420.0f } } },
+        };
+        for (int m = 0; m < 2; ++m)
+            for (auto& e : extras)
+            {
+                for (auto* prm : proc.getParameters())
+                    if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (prm))
+                        rp->setValueNotifyingHost (rp->getDefaultValue());
+                for (auto& [id, v] : e.values)
+                    set (proc, id, v);
+                proc.design.store (m);
+                run (proc, 0.5, noise);
+                std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
+                std::function<juce::Button* (juce::Component&)> find = [&] (juce::Component& c) -> juce::Button*
+                {
+                    for (auto* child : c.getChildren())
+                    {
+                        if (auto* b = dynamic_cast<juce::Button*> (child); b != nullptr && b->getName() == e.tab)
+                            return b;
+                        if (auto* f = find (*child))
+                            return f;
+                    }
+                    return nullptr;
+                };
+                if (auto* b = find (*editor); b != nullptr && b->onClick)
+                    b->onClick();
+                auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+                juce::File file (juce::File (dir).getChildFile (juce::String ("trendy-delay-") + (m == 0 ? "1980" : "2100") + "-" + e.file + ".png"));
+                file.deleteFile();
+                juce::FileOutputStream stream (file);
+                juce::PNGImageFormat().writeImageToStream (image, stream);
+            }
+        for (auto* prm : proc.getParameters())
+            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (prm))
+                rp->setValueNotifyingHost (rp->getDefaultValue());
+        proc.design.store (1);
     }
 
     std::printf (ok ? "\nALLE TESTS OK\n" : "\nTESTS FEHLGESCHLAGEN\n");
