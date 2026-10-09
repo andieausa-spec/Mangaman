@@ -1,0 +1,6 @@
+#!/bin/bash
+# Frühere Ausgabe unter dem Arbeitsnamen DEPECHE MACHINE entfernen
+rm -rf "/Library/Audio/Plug-Ins/Components/DEPECHE MACHINE.component" \
+       "/Library/Audio/Plug-Ins/VST3/DEPECHE MACHINE.vst3" \
+       "/Applications/DEPECHE MACHINE.app"
+exit 0

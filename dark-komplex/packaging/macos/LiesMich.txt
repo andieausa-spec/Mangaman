@@ -1,0 +1,27 @@
+DARK KOMPLEX – Installation auf dem Mac
+==========================================
+Song-Generator für dunklen Synthpop mit Gesang, Version 0.1 – Andreas Engel, Darmstadt, Deutschland
+
+1. Doppelklick auf „DARK KOMPLEX Installer.pkg“.
+
+   Meldet macOS „kann nicht geöffnet werden, da der Entwickler nicht verifiziert ist“:
+   Systemeinstellungen → Datenschutz & Sicherheit → ganz nach unten scrollen →
+   bei „DARK KOMPLEX Installer.pkg wurde blockiert“ auf „Trotzdem öffnen“ klicken.
+   (Der Installer ist nicht mit einer Apple-Developer-ID signiert.)
+
+2. Der Installer legt ab:
+   - AU-Instrument:   /Library/Audio/Plug-Ins/Components/DARK KOMPLEX.component  (Logic, GarageBand)
+   - VST3-Instrument: /Library/Audio/Plug-Ins/VST3/DARK KOMPLEX.vst3             (Cubase, Ableton Live, Bitwig …)
+   - Standalone:      /Programme/DARK KOMPLEX.app
+   Eine frühere Installation unter dem Namen DEPECHE MACHINE wird dabei entfernt.
+
+3. DAW neu starten.
+   Logic: Neue Software-Instrument-Spur → Instrument → AU-Instrumente → Andreas Engel → DARK KOMPLEX.
+   Cubase: Instrumentenspur hinzufügen → DARK KOMPLEX (Hersteller Andreas Engel).
+   Ableton Live: Einstellungen → Plug-ins → „VST3-Plug-in-Systemordner verwenden“ an → „Neu scannen“.
+
+4. Auf START drücken. Der Song läuft mit dem Tempo der DAW, wenn sie spielt,
+   sonst mit seiner eigenen Uhr. NEUER SONG würfelt einen ganz neuen Song,
+   der Schalter GESANG nimmt die Stimme dazu oder heraus.
+
+Läuft auf macOS 11 oder neuer, Apple Silicon und Intel.
