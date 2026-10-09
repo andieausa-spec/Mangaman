@@ -1,4 +1,8 @@
-# Mangaman – hybrider Synthesizer nach Vorbild des Arturia MicroFreak (AU / VST3 / Standalone)
+# TRENDY ANDY – hybrider Synthesizer nach Vorbild des Arturia MicroFreak (AU / VST3 / Standalone)
+
+Version 0.6 · produziert von Andreas Engel, Darmstadt, Deutschland
+
+(Früher „Mangaman“. Im Quellcode heißen das CMake-Ziel und die Klassen weiterhin `Mangaman`; die Plugin-Kennung `Andi`/`Mgmn` ist unverändert, alte Songs laden das Plugin also weiter.)
 
 ![Oberflaeche](Oberflaeche.png)
 
@@ -63,12 +67,12 @@ cmake --build build --config Release
 Beim ersten Lauf lädt CMake JUCE automatisch herunter (Internet nötig, dauert ein paar Minuten).
 Nach dem Bauen werden die Plugins automatisch installiert:
 
-- `~/Library/Audio/Plug-Ins/Components/Mangaman.component` (AU)
-- `~/Library/Audio/Plug-Ins/VST3/Mangaman.vst3` (VST3)
+- `~/Library/Audio/Plug-Ins/Components/TRENDY ANDY.component` (AU)
+- `~/Library/Audio/Plug-Ins/VST3/TRENDY ANDY.vst3` (VST3)
 
-Die Standalone-App liegt unter `build/Mangaman_artefacts/Release/Standalone/Mangaman.app`.
+Die Standalone-App liegt unter `build/Mangaman_artefacts/Release/Standalone/TRENDY ANDY.app`.
 
-**Logic:** nach dem Bauen Logic neu starten; das Plugin erscheint unter *Instrument → AU-Instrumente → Andi → Mangaman*.
+**Logic:** nach dem Bauen Logic neu starten; das Plugin erscheint unter *Instrument → AU-Instrumente → Andreas Engel → TRENDY ANDY*.
 Falls nicht: Logic → Einstellungen → Plug-in-Manager → „Zurücksetzen & Neu scannen“.
 Prüfen geht auch per Terminal: `auval -v aumu Mgmn Andi`
 
@@ -110,7 +114,7 @@ Lizenz: JUCE ist unter AGPLv3 frei nutzbar oder mit kommerzieller JUCE-Lizenz.
 ## Fertige Installer (.dmg / .exe)
 
 Der Workflow `.github/workflows/installer.yml` baut bei jedem Push auf `main` auf GitHub:
-- `Mangaman-<version>-macOS.dmg` (enthält einen .pkg-Installer für AU, VST3 und Standalone) – Skript `packaging/macos/make-dmg.sh`
-- `Mangaman-<version>-Windows-Setup.exe` (Inno Setup, VST3 und Standalone) – Skript `packaging/windows/Mangaman.iss`
+- `TrendyAndy-<version>-macOS.dmg` (enthält einen .pkg-Installer für AU, VST3 und Standalone) – Skript `packaging/macos/make-dmg.sh`
+- `TrendyAndy-<version>-Windows-Setup.exe` (Inno Setup, VST3 und Standalone) – Skript `packaging/windows/Mangaman.iss`
 
 Beide landen als Release `v<version>` auf der Releases-Seite des Repos. Sie sind nicht signiert.

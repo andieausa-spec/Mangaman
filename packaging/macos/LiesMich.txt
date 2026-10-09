@@ -1,20 +1,23 @@
-Mangaman – Installation auf dem Mac
-===================================
+TRENDY ANDY – Installation auf dem Mac
+======================================
+Hybrid-Synthesizer, Version 0.6 – Andreas Engel, Darmstadt, Deutschland
 
-1. Doppelklick auf „Mangaman Installer.pkg“.
+1. Doppelklick auf „TRENDY ANDY Installer.pkg“.
 
    Meldet macOS „kann nicht geöffnet werden, da der Entwickler nicht verifiziert ist“:
    Systemeinstellungen → Datenschutz & Sicherheit → ganz nach unten scrollen →
-   bei „Mangaman Installer.pkg wurde blockiert“ auf „Trotzdem öffnen“ klicken.
+   bei „TRENDY ANDY Installer.pkg wurde blockiert“ auf „Trotzdem öffnen“ klicken.
    (Der Installer ist nicht mit einer Apple-Developer-ID signiert.)
 
 2. Der Installer legt ab:
-   - AU-Plugin:    /Library/Audio/Plug-Ins/Components/Mangaman.component  (Logic, GarageBand)
-   - VST3-Plugin:  /Library/Audio/Plug-Ins/VST3/Mangaman.vst3             (Ableton Live, Cubase, Bitwig …)
-   - Standalone:   /Programme/Mangaman.app
+   - AU-Plugin:    /Library/Audio/Plug-Ins/Components/TRENDY ANDY.component  (Logic, GarageBand)
+   - VST3-Plugin:  /Library/Audio/Plug-Ins/VST3/TRENDY ANDY.vst3             (Ableton Live, Cubase, Bitwig …)
+   - Standalone:   /Programme/TRENDY ANDY.app
+   Eine ältere Installation unter dem Namen „Mangaman“ wird dabei entfernt;
+   Songs, die sie benutzen, laden automatisch TRENDY ANDY.
 
 3. DAW neu starten.
-   Logic: Instrument → AU-Instrumente → Andi → Mangaman.
+   Logic: Instrument → AU-Instrumente → Andreas Engel → TRENDY ANDY.
    Falls es fehlt: Logic → Einstellungen → Plug-in-Manager → „Zurücksetzen & Neu scannen“.
    Ableton Live: Einstellungen → Plug-ins → „VST3-Plug-in-Systemordner verwenden“ an → „Neu scannen“.
 

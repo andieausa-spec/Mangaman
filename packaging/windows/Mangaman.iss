@@ -1,8 +1,8 @@
-; Inno-Setup-Skript für Mangaman (VST3 + Standalone, 64 Bit)
-; Aufruf: iscc /DAppVersion=0.2.0 /DBuildDir=<...>\build\Mangaman_artefacts\Release /O<ausgabe> Mangaman.iss
+; Inno-Setup-Skript für TRENDY ANDY (VST3 + Standalone, 64 Bit)
+; Aufruf: iscc /DAppVersion=0.6.0 /DBuildDir=<...>\build\Mangaman_artefacts\Release /O<ausgabe> Mangaman.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.2.0"
+  #define AppVersion "0.6.0"
 #endif
 #ifndef BuildDir
   #define BuildDir "..\..\build\Mangaman_artefacts\Release"
@@ -10,22 +10,29 @@
 
 [Setup]
 AppId={{62DA37F7-F9F3-4689-B0E1-AAC52A4742AE}
-AppName=Mangaman
+AppName=TRENDY ANDY
 AppVersion={#AppVersion}
-AppVerName=Mangaman {#AppVersion}
-AppPublisher=Andi
-DefaultDirName={autopf}\Mangaman
-DefaultGroupName=Mangaman
+AppVerName=TRENDY ANDY {#AppVersion}
+AppPublisher=Andreas Engel, Darmstadt, Deutschland
+DefaultDirName={autopf}\TRENDY ANDY
+DefaultGroupName=TRENDY ANDY
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
-OutputBaseFilename=Mangaman-{#AppVersion}-Windows-Setup
+OutputBaseFilename=TrendyAndy-{#AppVersion}-Windows-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayName=Mangaman
-UninstallDisplayIcon={app}\Mangaman.exe
+UninstallDisplayName=TRENDY ANDY
+UninstallDisplayIcon={app}\TRENDY ANDY.exe
+
+[InstallDelete]
+; Vorgaenger "Mangaman" (gleiche Plugin-Kennung) entfernen
+Type: filesandordirs; Name: "{commoncf64}\VST3\Mangaman.vst3"
+Type: filesandordirs; Name: "{autopf}\Mangaman"
+Type: files; Name: "{autoprograms}\Mangaman.lnk"
+Type: files; Name: "{autodesktop}\Mangaman.lnk"
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
@@ -43,12 +50,12 @@ Name: "standalone"; Description: "Standalone-Programm (ohne DAW)"; Types: full
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Components: standalone; Flags: unchecked
 
 [Files]
-Source: "{#BuildDir}\VST3\Mangaman.vst3\*"; DestDir: "{commoncf64}\VST3\Mangaman.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
-Source: "{#BuildDir}\Standalone\Mangaman.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: standalone
+Source: "{#BuildDir}\VST3\TRENDY ANDY.vst3\*"; DestDir: "{commoncf64}\VST3\TRENDY ANDY.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
+Source: "{#BuildDir}\Standalone\TRENDY ANDY.exe"; DestDir: "{app}"; Flags: ignoreversion; Components: standalone
 
 [Icons]
-Name: "{autoprograms}\Mangaman"; Filename: "{app}\Mangaman.exe"; Components: standalone
-Name: "{autodesktop}\Mangaman";  Filename: "{app}\Mangaman.exe"; Components: standalone; Tasks: desktopicon
+Name: "{autoprograms}\TRENDY ANDY"; Filename: "{app}\TRENDY ANDY.exe"; Components: standalone
+Name: "{autodesktop}\TRENDY ANDY";  Filename: "{app}\TRENDY ANDY.exe"; Components: standalone; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Mangaman.exe"; Description: "{cm:LaunchProgram,Mangaman}"; Flags: nowait postinstall skipifsilent; Components: standalone
+Filename: "{app}\TRENDY ANDY.exe"; Description: "{cm:LaunchProgram,TRENDY ANDY}"; Flags: nowait postinstall skipifsilent; Components: standalone
