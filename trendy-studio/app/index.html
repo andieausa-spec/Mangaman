@@ -122,6 +122,8 @@ select { background: var(--field); border: 1px solid var(--line); border-radius:
 .kn .v { font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
 .drow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
 .drow > span { font-size: 10.5px; font-weight: 700; color: var(--dim); letter-spacing: .04em; }
+input[type=range] { accent-color: var(--accent); }
+.tnote { color: var(--dim); font-size: 10.5px; max-width: 46ch; font-weight: 400 !important; letter-spacing: 0 !important; }
 .empty-ed { color: var(--dim); padding: 24px 0; max-width: 60ch; }
 
 /* Step-Editor im Clip */
@@ -235,7 +237,7 @@ select { background: var(--field); border: 1px solid var(--line); border-radius:
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V0.7 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V0.8 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
@@ -1044,10 +1046,18 @@ async function enableMidi() {
     toast(MIDI.outs.length ? MIDI.outs.length + " MIDI-Ausgänge gefunden. Pro Spur im Gerät links unten wählen." : "MIDI ist an, aber kein Ausgang gefunden (IAC-Bus oder loopMIDI anlegen).");
   } catch (e) { toast("MIDI wurde hier gesperrt. In der Artifact-Ansicht passiert das oft; die Seite im eigenen Tab in Chrome öffnen."); }
 }
-function midiSend(tr, bytes, t) {
-  if (!tr.out) return; const o = MIDI.outs.find(x => x.id === tr.out); if (!o) return;
-  try { o.send(bytes, performance.now() + Math.max(0, (t - A.ctx.currentTime) * 1000)); } catch (e) {}
+/* Audio-Uhr auf MIDI-Zeitstempel abbilden: getOutputTimestamp sagt, welcher Audio-Moment gerade aus den Boxen kommt.
+   Der Abstand wird geglättet, damit MIDI exakt mit dem hörbaren Ton läuft und nicht mit dem Rechenpuffer. */
+function syncMidiClock() {
+  const ctx = A.ctx; let v;
+  const o = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
+  if (o && o.performanceTime > 0 && o.contextTime > 0) v = o.performanceTime - o.contextTime * 1000;
+  else v = performance.now() - ctx.currentTime * 1000 + (ctx.outputLatency || ctx.baseLatency || 0) * 1000;
+  A.mOfs = A.mOfs == null || Math.abs(v - A.mOfs) > 40 ? v : A.mOfs * .9 + v * .1;
 }
+function midiAt(t) { if (A.mOfs == null) syncMidiClock(); return Math.max(performance.now(), t * 1000 + A.mOfs + (P.midiOfs || 0)); }
+function midiRaw(id, bytes, t) { const o = MIDI.outs.find(x => x.id === id); if (!o) return; try { o.send(bytes, midiAt(t)); } catch (e) {} }
+function midiSend(tr, bytes, t) { if (tr.out) midiRaw(tr.out, bytes, t); }
 function midiNote(tr, t, n, vel, gate) {
   if (!tr.out) return; const c = (tr.ch - 1) & 15;
   midiSend(tr, [0x90 | c, clamp(n, 0, 127), clamp(Math.round(vel * 127), 1, 127)], t); midiSend(tr, [0x80 | c, clamp(n, 0, 127), 0], t + gate);
@@ -1068,17 +1078,25 @@ function play() {
   }
   T.playing = true; T.step = Math.round(T.startBeat * 4); T.time = A.ctx.currentTime + .06; T.queue = [];
   P.tracks.forEach(t => { if (t._inst) t._inst.prevTie = false; });
+  if (MIDI.access && P.clock && P.clock.on && P.clock.out) {
+    syncMidiClock(); const sp = T.step;
+    if (sp === 0) midiRaw(P.clock.out, [0xFA], T.time - .001);
+    else { midiRaw(P.clock.out, [0xF2, sp & 127, (sp >> 7) & 127], T.time - .002); midiRaw(P.clock.out, [0xFB], T.time - .001); }
+  }
   tick(); T.timer = setInterval(tick, 25); if (CLOCK) CLOCK.postMessage(20); $("bPlay").classList.add("on");
 }
 function stop() {
   if (!T.playing) { T.startBeat = 0; T.cur = 0; drawPlayhead(); updatePos(0); return; }
-  T.playing = false; clearInterval(T.timer); if (CLOCK) CLOCK.postMessage(0); stopAudioClips(A.ctx.currentTime);
+  T.playing = false; clearInterval(T.timer); if (CLOCK) CLOCK.postMessage(0);
+  if (P.clock && P.clock.on && P.clock.out) midiRaw(P.clock.out, [0xFC], A.ctx.currentTime);
+  stopAudioClips(A.ctx.currentTime);
   P.tracks.forEach(t => { if (t._inst && t._inst.silence) t._inst.silence(); midiSend(t, [0xB0 | ((t.ch - 1) & 15), 123, 0], A.ctx.currentTime); });
   T.queue = []; $("bPlay").classList.remove("on"); renderEditorNow(-1);
 }
 function stopAudioClips(t) { T.audio.forEach(a => { try { a.src.stop(t); } catch (e) {} }); T.audio.clear(); }
 function tick() {
   const ctx = A.ctx;
+  syncMidiClock();
   // Nach einer Blockade nicht alle verpassten Schritte auf einmal abfeuern, sondern das Raster sauber neu ansetzen
   if (T.time < ctx.currentTime) T.time = ctx.currentTime + .02;
   while (T.time < ctx.currentTime + LOOKAHEAD) {
@@ -1087,10 +1105,13 @@ function tick() {
     T.step++; T.time += spb() / 4;
   }
 }
-function scheduleStep(step, time) {
-  const beat = step / 4, sd = spb() / 4, sw = step % 2 ? (P.swing / 50 - 1) * sd : 0;
+function scheduleStep(step, time0) {
+  const time = time0, beat = step / 4, sd = spb() / 4, sw = step % 2 ? (P.swing / 50 - 1) * sd : 0;
   if (P.metro && step % 4 === 0) { const o = A.ctx.createOscillator(), g = A.ctx.createGain(); o.frequency.value = step % 16 === 0 ? 1760 : 1100; g.gain.setValueAtTime(.6, time); g.gain.setTargetAtTime(0, time + .002, .012); o.connect(g); g.connect(A.click); o.start(time); o.stop(time + .1); }
+  if (P.clock && P.clock.on && P.clock.out) for (let k = 0; k < 6; k++) midiRaw(P.clock.out, [0xF8], time + k * sd / 6);
   for (const tr of P.tracks) {
+    // Zeitversatz pro Spur (ms): negativ = früher, z. B. für träge Hardware oder Plugins mit Latenz
+    const time = Math.max(A.ctx.currentTime + .001, time0 + (tr.ofs || 0) / 1000);
     for (const c of tr.clips) {
       if (beat < c.start || beat >= c.start + c.len) continue;
       const i = (step - Math.round(c.start * 4)) % 16;
@@ -1520,6 +1541,7 @@ function menus() {
     { label: "Tempo tippen", key: { key: "t", label: "T" }, act: tapTempo },
     "-",
     { label: "MIDI einschalten", act: enableMidi, chk: () => !!MIDI.access },
+    { label: "Timing & MIDI-Clock …", act: timingBox },
     { label: "Alle Noten aus", act: panic },
   ] };
   const help = { title: "Hilfe", items: [{ label: "Tastaturkürzel", key: { key: "?", label: "?" }, act: keysBox }, "-", about] };
@@ -1588,7 +1610,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V0.7</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V0.8</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
@@ -1634,6 +1656,7 @@ function renderDevice() {
   } else {
     title("AUDIO-SPUR", tr.name);
     const r = el("div", "drow", dv); const b = el("button", "", r, "Audiodatei laden …"); b.onclick = () => pickAudio(tr, Math.floor(T.cur / 4) * 4);
+    timingKnob(dv, tr);
     el("div", "empty-ed", dv, "Datei laden oder aus dem Finder bzw. Explorer auf die Spur ziehen. Sie startet dort, wo sie losgelassen wird. Aufnehmen übers Mikrofon erlaubt die Artifact-Ansicht nicht.").style.padding = "10px 0";
     return;
   }
@@ -1646,10 +1669,39 @@ function renderDevice() {
   const sc = el("select", "", r); sc.setAttribute("aria-label", "MIDI-Kanal");
   for (let i = 1; i <= 16; i++) el("option", "", sc, "Kanal " + i).value = i;
   sc.value = tr.ch; sc.onchange = () => { tr.ch = +sc.value; save(); };
+  timingKnob(dv, tr);
   const ib = el("button", tr.intern ? "on" : "", r, "Interner Klang"); ib.setAttribute("aria-pressed", tr.intern);
   ib.onclick = () => { tr.intern = !tr.intern; if (!tr.intern && tr._inst && tr._inst.silence) tr._inst.silence(); save(); renderDevice(); };
 }
 
+const msFmt = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v)) + " ms";
+function timingKnob(dv, tr) {
+  const r = el("div", "drow", dv); el("span", "", r, "TIMING");
+  knob(r, { label: "VERSATZ", bip: true, def: .5, get: () => ((tr.ofs || 0) + 100) / 200, set: v => { tr.ofs = Math.round(v * 200 - 100); save(); }, fmt: () => msFmt(tr.ofs || 0) });
+  el("span", "tnote", r, "Spur früher (−) oder später (+), für Interner Klang und MIDI. Global: Tools › Timing & MIDI-Clock.");
+}
+function timingBox() {
+  if (!P.clock) P.clock = { on: false, out: "" };
+  modal("TIMING & MIDI-CLOCK", "", [["Fertig", null, true]]);
+  const b = $("mBody");
+  el("p", "", b, "Alle Noten werden im Voraus auf die Audio-Uhr gelegt; MIDI bekommt dabei exakte Zeitstempel, abgeglichen mit dem, was gerade aus den Boxen kommt.");
+  const row = (label) => { const r = el("div", "drow", b); el("span", "", r, label); return r; };
+  const r1 = row("MIDI-VERSATZ GESAMT");
+  const rg = el("input", "", r1); rg.type = "range"; rg.min = -200; rg.max = 200; rg.step = 1; rg.value = P.midiOfs || 0; rg.setAttribute("aria-label", "MIDI-Versatz gesamt");
+  const out = el("b", "", r1); out.textContent = msFmt(P.midiOfs || 0);
+  rg.oninput = () => { P.midiOfs = +rg.value; out.textContent = msFmt(P.midiOfs); save(); };
+  const z = el("button", "", r1, "0"); z.onclick = () => { rg.value = 0; rg.oninput(); };
+  el("p", "tnote", b, "Klingen externe Geräte zu spät, den Wert ins Minus ziehen; zu früh, ins Plus. Feinarbeit pro Spur mit dem Knopf TIMING im Gerätefeld.");
+  const r2 = row("MIDI-CLOCK SENDEN");
+  const on = el("button", P.clock.on ? "on" : "", r2, P.clock.on ? "An" : "Aus");
+  const so = el("select", "", r2); so.setAttribute("aria-label", "Ausgang für MIDI-Clock");
+  el("option", "", so, MIDI.access ? "– Ausgang wählen –" : "– erst MIDI einschalten –").value = "";
+  MIDI.outs.forEach(o => { const op = el("option", "", so); op.value = o.id; op.textContent = o.name; });
+  so.value = MIDI.outs.some(o => o.id === P.clock.out) ? P.clock.out : "";
+  so.onchange = () => { P.clock.out = so.value; save(); };
+  on.onclick = () => { P.clock.on = !P.clock.on; on.classList.toggle("on", P.clock.on); on.textContent = P.clock.on ? "An" : "Aus"; save(); if (P.clock.on && !MIDI.access) enableMidi().then(() => timingBox()); };
+  el("p", "tnote", b, "24 Impulse pro Viertel, dazu Start, Stopp und Songposition. Drumcomputer, Sequenzer und Arpeggiatoren laufen damit synchron mit; der MIDI-Versatz gilt auch für die Clock.");
+}
 function instSelect(dv, tr) {
   const r = el("div", "drow", dv); r.style.margin = "0 0 8px"; el("span", "", r, "INSTRUMENT");
   const s = el("select", "", r); s.setAttribute("aria-label", "Instrument");
