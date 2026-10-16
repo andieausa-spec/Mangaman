@@ -59,6 +59,9 @@ select { background: var(--field); border: 1px solid var(--line); border-radius:
 .pblist button { text-align: left; height: auto; min-height: 26px; padding: 3px 8px; display: flex; flex-direction: column; align-items: flex-start; }
 .pblist button.on small, .pbcats button.on small { color: var(--ink); }
 @media (max-width: 640px) { .pbwrap { flex-direction: column; } .pbcats { width: auto; flex-direction: row; flex-wrap: wrap; max-height: 110px; } }
+.harmthemes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 6px; }
+.harmthemes button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 6px 8px; height: auto; }
+.harmthemes small { font: 10px var(--mono); opacity: .75; }
 #modal .acts { display: flex; justify-content: flex-end; gap: 6px; padding: 0 14px 12px; }
 
 /* Transport */
@@ -261,7 +264,7 @@ input[type=range] { accent-color: var(--accent); }
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V0.9 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V1.0 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
@@ -271,7 +274,7 @@ input[type=range] { accent-color: var(--accent); }
     <div class="lcd" id="pos">  1.  1.  1</div>
     <div class="grp"><label>BPM</label><div class="num" id="nBpm" tabindex="0" role="spinbutton" aria-label="Tempo"></div>
       <label>SWING</label><div class="num" id="nSwing" tabindex="0" role="spinbutton" aria-label="Swing"></div></div>
-    <div class="grp"><label>TONART</label><select id="sRoot" aria-label="Grundton"></select><select id="sScale" aria-label="Skala"></select></div>
+    <div class="grp"><label>TONART</label><select id="sRoot" aria-label="Grundton"></select><select id="sScale" aria-label="Skala"></select><button id="bHarm" title="KI-Harmonie: die anderen Spuren passen sich an">KI-HARMONIE</button></div>
     <div class="grp"><label>RASTER</label><select id="sSnap" aria-label="Raster"><option value="0.25">1/16</option><option value="1">1/4</option><option value="4">Takt</option></select></div>
     <div class="spacer"></div>
     <div class="grp"><button id="bMidi" title="Web MIDI einschalten">MIDI</button></div>
@@ -363,11 +366,14 @@ const hist = { past: [], future: [], last: null };
 function save() { clearTimeout(saveT); saveT = setTimeout(commit, 350); }
 function commit() {
   clearTimeout(saveT); saveT = 0;
+  const skip = HARM.skip; HARM.skip = false;
+  const ch = skip ? null : harmPrep(hist.last);
   const s = JSON.stringify(P, strip_);
   if (s === hist.last) return;
   if (hist.last !== null) { hist.past.push(hist.last); if (hist.past.length > 150) hist.past.shift(); hist.future = []; }
   hist.last = s;
   try { localStorage.setItem("trendy-studio", s); } catch (e) {}
+  if (ch) harmRun(ch);
 }
 function flushSave() { if (saveT) commit(); }
 function load() { try { const d = JSON.parse(localStorage.getItem("trendy-studio") || "null"); if (d && Array.isArray(d.tracks) && d.master && Array.isArray(d.ret)) P = fixDrumClips(Object.assign(demoProject(), d)); } catch (e) {} }
@@ -1062,6 +1068,242 @@ function setInstrument(tr, kind) {
   save(); renderArr(); renderMixer(); renderDevice(); if (!$("inst").hidden) renderInst();
 }
 
+
+/* ================= KI-Harmonie: halbautomatisches Arrangieren =================
+   Ändert sich eine Synth-Spur (Preset, Hand, Zufall), wird ihre Harmonie pro halbem Takt erkannt und die anderen
+   Synth-Spuren ziehen nach: Flächen spielen den passenden Akkord, Bass und Melodie behalten Rhythmus und Kontur.
+   Jeder Clip merkt sich deine letzte eigene Eingabe (c.ho); angepasst wird immer von dort aus, nichts driftet weg. */
+const HARM_STYLES = ["House", "Dub", "Electro"];
+const HARM = { skip: false };
+const HARM_THEMES = [
+  // [Stil, Name, Stufen (0 = Grundton der Tonart), Takte pro Akkord]
+  [0, "Deep Night", [0, 5, 2, 6], 1], [0, "Garage Soul", [0, 3], 2], [0, "Sunrise", [5, 6, 0, 0], 1], [0, "Lounge Drift", [0, 2, 3, 5], 1],
+  [0, "Late Train", [0, 6, 5, 6], 1], [0, "Warehouse", [0, 0, 3, 4], 1], [0, "Chicago Jack", [0, 3, 0, 6], 1],
+  [1, "Rockers", [0, 3], 2], [1, "Steppers", [0, 6], 2], [1, "Echo Chamber", [0, 0, 3, 3], 2], [1, "Lion Dub", [0, 3, 0, 4], 1],
+  [1, "Basic Channel", [0], 4], [1, "Sound System", [0, 5, 0, 6], 1], [1, "Black Ark", [0, 6, 5, 6], 2],
+  [2, "Autobahn Nacht", [0, 0, 5, 6], 1], [2, "Detroit Grid", [0, 5, 3, 4], 1], [2, "Roboterherz", [0, 2, 6, 5], 1],
+  [2, "Kalte Welle", [0, 0, 0, 6], 1], [2, "Neon Tunnel", [0, 3, 5, 4], 1], [2, "Planet Rock", [0, 6], 1],
+];
+function harmCfg() { if (!P.harm) P.harm = {}; const h = P.harm; if (h.on == null) h.on = true; if (h.style == null) h.style = 0; if (!h.lead) h.lead = "auto"; if (!h.lock) h.lock = {}; if (h.weird == null) h.weird = .1; if (h.seed == null) h.seed = 1 + Math.floor(Math.random() * 1e6); return h; }
+function harmRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
+const harmN = () => SCALES[P.scale][1].length;
+// Für Akkordfarben gilt bei „Chromatisch“ die Molltonleiter
+const harmPcs = () => new Set((P.scale === 0 ? SCALES[1][1] : SCALES[P.scale][1]).map(x => (P.root + x) % 12));
+function degPc(d) { const sc = SCALES[P.scale][1], n = sc.length; return (P.root + sc[((d % n) + n) % n]) % 12; }
+function styleChord(r, style, rnd, weird) {
+  const pcs = harmPcs(), pc = degPc(r), h = x => pcs.has((pc + x) % 12), maj = h(4) && h(7), min = h(3) && h(7);
+  let c;
+  if (style === 0) c = maj ? (h(11) ? 6 : h(10) ? 8 : 3) : min ? (h(10) ? 7 : 4) : h(7) ? 2 : 1;
+  else if (style === 1) c = min ? (h(10) ? 7 : 4) : maj ? 3 : h(7) ? 2 : 1;
+  else c = min ? 4 : maj ? 3 : h(7) ? 2 : 1;
+  // Weirdness: Farbe tauschen (Sus4, Quinte, Weit), auch mal außerhalb der Tonart
+  if (rnd && rnd() < weird * .6) c = [5, 2, 9, 8, 6, 7][Math.floor(rnd() * 6)];
+  return c;
+}
+const chordPcs = (r, ch) => new Set(CHORDS[ch].map(x => (degPc(r) + x) % 12));
+const REL_W = [3, -1, .1, 1.3, 1.3, .1, -1, 1.5, -.6, -.3, .6, .4];
+function harmWin(s, oct, i0, i1) {
+  const n = harmN(), N = 2 * n, notes = []; let mw = 0;
+  for (let i = i0; i < i1; i++) {
+    if (!s.on[i]) continue;
+    const d = Math.round(s.pitch[i] * N), m = P.root + 12 * oct + SCALES[P.scale][1][d % n] + 12 * Math.floor(d / n);
+    const w = s.vel[i] * (.6 + s.len[i]) * (i === i0 ? 1.6 : i % 4 === 0 ? 1.3 : 1); mw = Math.max(mw, w);
+    (CHORDS[Math.round((s.chd ? s.chd[i] : 0) * (CHORDS.length - 1))] || [0]).forEach((x, k) => notes.push([m + x, k ? w * .8 : w]));
+  }
+  if (!notes.length) return null;
+  const low = notes.reduce((a, b) => b[0] < a ? b[0] : a, 1e9) % 12, pcs = harmPcs();
+  let best = 0, bs = -1e9;
+  for (let r = 0; r < n; r++) {
+    const rp = degPc(r); let sc = r === 0 ? .1 : 0;
+    for (const [m, w] of notes) sc += w * REL_W[((m - rp) % 12 + 12) % 12];
+    if (low === rp) sc += 2.5 * mw;
+    if (!pcs.has((rp + 7) % 12)) sc -= 1.5 * mw;
+    if (sc > bs) { bs = sc; best = r; }
+  }
+  return best;
+}
+function harmRoots(s, oct) { let a = harmWin(s, oct, 0, 8), b = harmWin(s, oct, 8, 16); if (a == null) a = b; if (b == null) b = a; return [a, b]; }
+function harmRole(tr) {
+  if (tr.inst === "planet" || /fläch|pad|akkord|chord|stab|skank|streich|string|orgel/i.test(tr.name) || tr.clips.some(c => c.s && c.s.chd && c.s.chd.some(x => x > 0))) return "pad";
+  if (/bass/i.test(tr.name) || (!/lead|melod|arp/i.test(tr.name) && tr.clips.every(c => (c.oct || 0) <= 0))) return "bass";
+  return "lead";
+}
+const harmBase = c => c.ho && c.ho.on && c.ho.on.length === 16 ? c.ho : c.s;
+const harmMark = c => { if (c.s) c.ho = { on: c.s.on.slice(), pitch: c.s.pitch.slice(), chd: (c.s.chd || Array(16).fill(0)).slice() }; };
+// Harmonieplan der führenden Spur: absoluter 16tel-Schritt -> Stufe
+function leaderMap(tr) {
+  const map = new Map();
+  for (const c of tr.clips.slice().sort((a, b) => a.start - b.start)) {
+    if (!c.s) continue; const ro = harmRoots(c.s, c.oct || 0); if (ro[0] == null) continue;
+    const s0 = Math.round(c.start * 4), s1 = Math.round((c.start + c.len) * 4);
+    for (let a = s0; a < s1; a++) map.set(a, ro[(a - s0) % 16 < 8 ? 0 : 1]);
+  }
+  return map;
+}
+function themeMap(th, bars) {
+  const h = harmCfg(), map = new Map(), rnd = harmRng(h.seed ^ hashStr(th[1])), n = harmN();
+  for (let b = bars[0]; b < bars[1]; b++) {
+    let r = th[2][Math.floor((b - bars[0]) / th[3]) % th[2].length] % n;
+    // Weirdness: hin und wieder ein überraschender Akkord statt des geplanten
+    if (rnd() < h.weird * .5) r = Math.floor(rnd() * n);
+    for (let i = 0; i < 16; i++) map.set(b * 16 + i, r);
+  }
+  return map;
+}
+function adaptClip(c, T, role, style, rnd, weird, keepOwn) {
+  const base = harmBase(c), n = harmN(), N = 2 * n, s = c.s, own = harmRoots({ ...s, on: base.on, pitch: base.pitch, chd: base.chd }, c.oct || 0);
+  for (let i = 0; i < 16; i++) { s.on[i] = base.on[i]; s.pitch[i] = base.pitch[i]; if (s.chd) s.chd[i] = base.chd[i] || 0; }
+  if (!s.chd) s.chd = Array(16).fill(0);
+  if (role === "pad") {
+    // Gehaltene Flächen schlagen beim Akkordwechsel neu an
+    for (let j = 1; j < 16; j++) {
+      if (s.on[j] || T[j] == null || T[j - 1] == null || T[j] === T[j - 1]) continue;
+      let k = j - 1; while (k >= 0 && !s.on[k]) k--;
+      if (k >= 0 && s.len[k] >= .98) { s.on[j] = 1; ["vel", "len", "flt", "rat", "pitch", "chd"].forEach(f => s[f][j] = s[f][k]); }
+    }
+  }
+  const near = (r, x) => { let b = r, bd = 1e9; for (let d = r; d <= N; d += n) if (Math.abs(d - x) < bd) { bd = Math.abs(d - x); b = d; } return b; };
+  const snap = (x, set) => { for (let k = 0; k <= 4; k++) for (const d of [x - k, x + k]) if (d >= 0 && d <= N && set.has(degPc(d))) return d; return x; };
+  let lastR = null, chordAt = {};
+  for (let i = 0; i < 16; i++) {
+    if (!s.on[i] || T[i] == null) continue;
+    let r = T[i]; const x = Math.round(s.pitch[i] * N), w0 = i < 8 ? 0 : 8;
+    // Deine eigene Fläche bleibt, solange ihr Akkord den neuen Grundton schon enthält (F-Dur über Bass A klingt gut)
+    if (keepOwn && role === "pad") { const ro = own[i < 8 ? 0 : 1], oc = Math.round((base.chd[i] || 0) * (CHORDS.length - 1)); if (ro != null && (chordPcs(ro, oc || styleChord(ro, style)).has(degPc(r)) || [3, 4].includes((degPc(ro) - degPc(r) + 12) % 12))) r = ro; }
+    if (chordAt[r] == null) chordAt[r] = styleChord(r, style, rnd, weird);
+    const ch = chordAt[r];
+    let d;
+    if (role === "pad") { d = near(r, x); if (r !== T[i] && base.chd[i]) s.chd[i] = base.chd[i]; else s.chd[i] = ch / (CHORDS.length - 1); }
+    else {
+      const ro = own[i < 8 ? 0 : 1]; let dl = ro == null ? 0 : r - ro;
+      while (dl > n / 2) dl -= n; while (dl <= -n / 2) dl += n;
+      d = x + dl; while (d < 0) d += n; while (d > N) d -= n;
+      let first = true; for (let k = w0; k < i; k++) if (s.on[k]) first = false;
+      if (role === "bass" && (first || r !== lastR)) d = near(r, d);
+      else if (i % 4 === 0) {
+        const all = chordPcs(r, ch), rp = degPc(r);
+        const set = role === "bass" ? new Set(style === 2 ? [rp, (rp + 7) % 12] : style === 0 ? [...all].filter(p => [0, 7, 10, 11].includes((p - rp + 12) % 12)) : all) : all;
+        d = snap(d, set);
+      } else if (rnd() < weird * .5) d = clamp(d + [-2, -1, 1, 2, n][Math.floor(rnd() * 5)], 0, N); // Weirdness: schräge Durchgangstöne
+      if (role === "lead" && rnd() < weird * .25) s.on[i] = 0; // und hier und da eine Lücke
+    }
+    s.pitch[i] = d / N; lastR = r;
+  }
+  if (role === "lead" && weird > .3) for (let i = 1; i < 16; i += 2) if (!s.on[i] && T[i] != null && rnd() < (weird - .3) * .3) { s.on[i] = 1; s.pitch[i] = snap(Math.round(s.pitch[i - 1] * N) + 1, chordPcs(T[i], chordAt[T[i]] ?? styleChord(T[i], style))) / N; }
+}
+function sigClip(c) { return JSON.stringify([c.start, c.len, c.oct, c.s.on, c.s.pitch, c.s.chd]); }
+function trackSig(t) { return t && t.kind === "synth" ? JSON.stringify((t.clips || []).filter(c => c.s).map(c => [c.id, c.start, c.len, c.oct, c.s.on, c.s.pitch, c.s.chd]).sort()) : ""; }
+// Folgespuren an einen Harmonieplan anpassen; Clips, über denen die Harmonie innerhalb wechselt, werden taktweise geteilt
+function applyHarmony(map, followers, keepOwn) {
+  const h = harmCfg(), names = [];
+  for (const tr of followers) {
+    const before = trackSig(tr), role = harmRole(tr), out = [];
+    for (const c of tr.clips) {
+      if (!c.s) { out.push(c); continue; }
+      if (!c.ho) harmMark(c);
+      const s0 = Math.round(c.start * 4), nb = Math.max(1, Math.ceil(c.len / 4 - 1e-9)), sigs = [];
+      for (let k = 0; k < nb; k++) { const t = []; for (let i = 0; i < 16; i++) { const a = s0 + 16 * k + i; t.push(a < Math.round((c.start + c.len) * 4) && map.has(a) ? map.get(a) : "x"); } sigs.push(t.join(",")); }
+      const runs = []; sigs.forEach((g, k) => { if (runs.length && runs[runs.length - 1].g === g) runs[runs.length - 1].e = k + 1; else runs.push({ g, b: k, e: k + 1 }); });
+      runs.forEach((ru, j) => {
+        let p = c;
+        if (runs.length > 1) { p = j ? JSON.parse(JSON.stringify(c, strip_)) : c; if (j) p.id = uid(); }
+        const st = c.start + 4 * ru.b, ln = Math.min(4 * (ru.e - ru.b), c.start + c.len - st);
+        if (j) { p.start = st; p.ho = JSON.parse(JSON.stringify(c.ho)); }
+        p._newLen = ln; out.push(p);
+        const T = ru.g.split(",").map(v => v === "x" ? null : +v);
+        if (T.some(v => v != null)) adaptClip(p, T, role, h.style, harmRng(h.seed ^ hashStr(tr.id + ":" + st)), h.weird, keepOwn);
+      });
+    }
+    out.forEach(p => { if (p._newLen != null) { p.len = p._newLen; delete p._newLen; } });
+    tr.clips = out;
+    if (trackSig(tr) !== before) names.push(tr.name);
+  }
+  return names;
+}
+function harmFollowers(L) { const h = harmCfg(); return P.tracks.filter(t => t.kind === "synth" && t !== L && !h.lock[t.id] && t.clips.length); }
+function harmRefresh() {
+  setTimeout(() => {
+    const tr = findTrack(sel.track); if (tr && sel.clip && !tr.clips.some(c => c.id === sel.clip)) sel.clip = null;
+    renderArr(); renderEditor(); if (!$("modal").hidden && $("harmBody")) harmBox();
+  }, 0);
+}
+function harmCommit() { HARM.skip = true; commit(); }
+// commit() ruft erst harmPrep (vor dem Speichern deiner Änderung), dann harmRun (Anpassung als eigener Rückgängig-Schritt)
+function harmPrep(prevTxt) {
+  const h = harmCfg(); if (!h.on || !prevTxt) return null;
+  let prev; try { prev = JSON.parse(prevTxt); } catch (e) { return null; }
+  if (!prev || prev.root !== P.root || prev.scale !== P.scale || !Array.isArray(prev.tracks)) return null;
+  const pt = new Map(prev.tracks.map(t => [t.id, t]));
+  const changed = P.tracks.filter(t => t.kind === "synth" && trackSig(t) !== trackSig(pt.get(t.id) || { kind: "synth", clips: [] }));
+  // Was du von Hand änderst, wird zur neuen eigenen Fassung dieser Clips
+  changed.forEach(t => { const pc = new Map(((pt.get(t.id) || {}).clips || []).map(c => [c.id, c])); t.clips.forEach(c => { const o = pc.get(c.id); if (c.s && (!o || !o.s || sigClip(o) !== sigClip(c))) harmMark(c); }); });
+  return changed.length ? changed : null;
+}
+function harmRun(changed) {
+  const h = harmCfg(); let L;
+  if (h.lead !== "auto") { L = findTrack(h.lead); if (!L || !changed.includes(L)) return; }
+  else L = changed.find(t => t.id === sel.track) || changed[0];
+  harmonizeFrom(L, false);
+}
+function harmonizeFrom(L, loud) {
+  const h = harmCfg(), map = leaderMap(L);
+  // Leitfaden (gewähltes Thema): Passt der Ton der führenden Spur in den geplanten Akkord, bleibt der Plan
+  if (h.plan) map.forEach((r, a) => { const pr = h.plan[Math.floor(a / 16)]; if (pr != null && pr !== r && chordPcs(pr, styleChord(pr, h.style)).has(degPc(r))) map.set(a, pr); });
+  const names = map.size ? applyHarmony(map, harmFollowers(L), true) : [];
+  harmCommit(); harmRefresh();
+  if (names.length) toast("KI-Harmonie (" + HARM_STYLES[h.style] + "): " + names.join(", ") + " " + (names.length > 1 ? "folgen" : "folgt") + " jetzt „" + L.name + "“. Gefällt’s nicht: " + MOD + "Z.");
+  else if (loud) toast(map.size ? "Alles passt schon zu „" + L.name + "“." : "„" + L.name + "“ hat keine Noten, an die sich etwas anpassen könnte.");
+}
+function harmBars() {
+  if (P.loop.on && P.loop.end > P.loop.start) return [Math.floor(P.loop.start / 4), Math.ceil(P.loop.end / 4)];
+  const cl = P.tracks.filter(t => t.kind === "synth").flatMap(t => t.clips);
+  return cl.length ? [Math.floor(Math.min(...cl.map(c => c.start)) / 4), Math.ceil(Math.max(...cl.map(c => c.start + c.len)) / 4)] : [0, 4];
+}
+function applyTheme(k) {
+  flushSave(); const h = harmCfg(), th = HARM_THEMES[k]; h.theme = k; h.style = th[0];
+  const map = themeMap(th, harmBars()), tracks = P.tracks.filter(t => t.kind === "synth" && !h.lock[t.id] && t.clips.length);
+  h.plan = {}; map.forEach((r, a) => h.plan[Math.floor(a / 16)] = r);
+  const names = applyHarmony(map, tracks);
+  // Das Thema wird die neue eigene Fassung der Flächen; Bass und Melodie behalten deine Linie
+  tracks.forEach(t => { if (harmRole(t) === "pad") t.clips.forEach(harmMark); });
+  harmCommit(); harmRefresh(); $("bHarm").classList.toggle("on", h.on);
+  toast("Thema „" + th[1] + "“ (" + themeChords(th) + ") " + (names.length ? "auf " + names.join(", ") + " gelegt." : ": keine Synth-Clips im Bereich."));
+}
+function themeChords(th) { const h = harmCfg(), n = harmN(); return th[2].map(r => { const c = styleChord(r % n, th[0]); return KEYS[degPc(r % n)] + ["", "", "5", "", "m", "sus4", "maj7", "m7", "7", "add10"][c]; }).join(" – "); }
+function harmBox() {
+  const h = harmCfg();
+  modal("KI-HARMONIE · HALBAUTOMATISCH ARRANGIEREN", "<div id='harmBody'></div>", [["Fertig", null, true]]);
+  const b = $("harmBody");
+  el("p", "", b, "Änderst du eine Synth-Spur, ob per Preset, von Hand oder per Zufall, ziehen die anderen mit: Flächen nehmen den passenden Akkord, Bass und Melodie behalten Rhythmus und Linie und rutschen auf die richtigen Töne. Deine eigenen Eingaben bleiben gespeichert, es wird immer von ihnen aus angepasst.");
+  const row = l => { const r = el("div", "drow", b); el("span", "", r, l); return r; };
+  const r1 = row("KI-HARMONIE"); const on = el("button", h.on ? "on" : "", r1, h.on ? "An" : "Aus");
+  on.onclick = () => { h.on = !h.on; save(); $("bHarm").classList.toggle("on", h.on); harmBox(); };
+  const r2 = row("STIL"); HARM_STYLES.forEach((s, k) => { const x = el("button", h.style === k ? "on" : "", r2, s); x.onclick = () => { h.style = k; save(); harmBox(); }; });
+  const r3 = row("WEIRDNESS");
+  const rg = el("input", "", r3); rg.type = "range"; rg.min = 0; rg.max = 100; rg.value = Math.round(h.weird * 100); rg.setAttribute("aria-label", "Weirdness");
+  const wo = el("b", "", r3, rg.value + " %"); rg.oninput = () => { h.weird = rg.value / 100; wo.textContent = rg.value + " %"; save(); };
+  const dice = el("button", "", r3, "Neu würfeln"); dice.title = "Andere Zufälle bei gleicher Weirdness";
+  dice.onclick = () => { h.seed = 1 + Math.floor(Math.random() * 1e6); const L = findTrack(h.lead) || findTrack(sel.track); if (h.theme != null && h.lead === "auto") applyTheme(h.theme); else if (L && L.kind === "synth") harmonizeFrom(L, true); else save(); };
+  el("p", "tnote", b, "0 % bleibt brav in der Tonart. Je höher, desto mehr schräge Akkordfarben, Durchgangstöne, Lücken und Überraschungsakkorde. Gleiche Einstellung gibt gleiches Ergebnis, „Neu würfeln“ zieht andere Zufälle.");
+  const r4 = row("FÜHRT"); const ls = el("select", "", r4); ls.setAttribute("aria-label", "Führende Spur");
+  el("option", "", ls, "Automatisch: die Spur, die du gerade änderst").value = "auto";
+  P.tracks.filter(t => t.kind === "synth").forEach(t => el("option", "", ls, t.name).value = t.id);
+  ls.value = h.lead === "auto" || findTrack(h.lead) ? h.lead : "auto"; ls.onchange = () => { h.lead = ls.value; save(); };
+  const go = el("button", "on", r4, "Jetzt anpassen");
+  go.onclick = () => { const L = findTrack(h.lead) || (findTrack(sel.track) && findTrack(sel.track).kind === "synth" ? findTrack(sel.track) : P.tracks.find(t => t.kind === "synth" && harmRole(t) === "bass") || P.tracks.find(t => t.kind === "synth")); if (L) harmonizeFrom(L, true); };
+  const r5 = row("FOLGEN");
+  P.tracks.filter(t => t.kind === "synth").forEach(t => { const x = el("button", h.lock[t.id] ? "" : "on", r5, t.name + " · " + { pad: "Fläche", bass: "Bass", lead: "Melodie" }[harmRole(t)]); x.title = "Passt sich an / bleibt wie sie ist"; x.onclick = () => { if (h.lock[t.id]) delete h.lock[t.id]; else h.lock[t.id] = true; save(); harmBox(); }; });
+  el("p", "tnote", b, "Ausgeschaltete Spuren bleiben unangetastet, können aber weiter führen. Schlagzeug und Audio bleiben immer wie sie sind.");
+  if (h.plan && h.theme != null && HARM_THEMES[h.theme]) { const r7 = row("LEITFADEN"); el("b", "", r7).textContent = HARM_THEMES[h.theme][1] + " · " + themeChords(HARM_THEMES[h.theme]); const lo = el("button", "", r7, "lösen"); lo.title = "Ohne Leitfaden folgt alles nur der Spur, die du änderst"; lo.onclick = () => { h.plan = null; h.theme = null; save(); harmBox(); }; }
+  const r6 = row("THEMEN · " + HARM_STYLES[h.style].toUpperCase()); r6.style.alignItems = "stretch";
+  el("p", "tnote", b, "Ein Thema legt eine Akkordfolge über " + (P.loop.on ? "die Schleife" : "den ganzen Song") + " und alle folgenden Synth-Spuren richten sich danach. Es bleibt als Leitfaden: Änderst du danach etwas, wird nur dort umharmonisiert, wo deine neuen Töne nicht mehr in den geplanten Akkord passen.");
+  const tl = el("div", "harmthemes", b);
+  HARM_THEMES.forEach((th, k) => { if (th[0] !== h.style) return; const x = el("button", h.theme === k ? "on" : "", tl); el("b", "", x).textContent = th[1]; el("small", "", x).textContent = themeChords(th) + (th[3] > 1 ? " · je " + th[3] + " Takte" : ""); x.onclick = () => applyTheme(k); });
+  const rr = el("button", "", tl, "<b>Überrasch mich</b><small>zufälliges Thema im Stil " + HARM_STYLES[h.style] + "</small>");
+  rr.onclick = () => { const ks = HARM_THEMES.map((t, k) => t[0] === h.style ? k : -1).filter(k => k >= 0); h.seed = 1 + Math.floor(Math.random() * 1e6); applyTheme(ks[Math.floor(Math.random() * ks.length)]); };
+}
+
 /* ================= MIDI ================= */
 const MIDI = { access: null, outs: [] };
 async function enableMidi() {
@@ -1426,12 +1668,12 @@ function validProject(d) { return d && Array.isArray(d.tracks) && d.tracks.every
 function loadProjectText(txt, label) {
   let d; try { d = JSON.parse(txt); } catch (e) { toast("Das ist kein TRENDY-STUDIO-Projekt (kein gültiges JSON)."); return false; }
   if (!validProject(d)) { toast("Das ist kein TRENDY-STUDIO-Projekt."); return false; }
-  flushSave(); applyProject(d); commit(); toast("Projekt " + (label ? "„" + label + "“ " : "") + "geladen."); return true;
+  flushSave(); applyProject(d); HARM.skip = true; commit(); toast("Projekt " + (label ? "„" + label + "“ " : "") + "geladen."); return true;
 }
 function newProject() {
   confirmBox("Neues Projekt", "Das aktuelle Projekt wird geleert. Mit „Bearbeiten › Rückgängig“ kommst du zurück.", "Neues Projekt", () => {
     const d = demoProject(); d.tracks = [mkTrack("synth", "Synth 1", COLORS[0]), mkTrack("drum", "Drums 1", COLORS[4])]; d.loop = { on: false, start: 0, end: 16 }; d.bpm = 120; d.swing = 50;
-    flushSave(); applyProject(JSON.parse(JSON.stringify(d))); commit(); toast("Neues, leeres Projekt.");
+    flushSave(); applyProject(JSON.parse(JSON.stringify(d))); HARM.skip = true; commit(); toast("Neues, leeres Projekt.");
   });
 }
 let clipBoard = null;
@@ -1572,6 +1814,7 @@ function menus() {
     "-",
     { label: "MIDI einschalten", act: enableMidi, chk: () => !!MIDI.access },
     { label: "Timing & MIDI-Clock …", act: timingBox },
+    { label: "KI-Harmonie …", act: harmBox, chk: () => harmCfg().on },
     { label: "Alle Noten aus", act: panic },
   ] };
   const help = { title: "Hilfe", items: [{ label: "Tastaturkürzel", key: { key: "?", label: "?" }, act: keysBox }, "-", about] };
@@ -1640,7 +1883,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V0.9</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.0</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
@@ -2725,7 +2968,7 @@ const NF = {};
 function syncTop() {
   if (NF.bpm) { NF.bpm.show(); NF.swing.show(); }
   $("sRoot").value = P.root; $("sScale").value = P.scale; $("sSnap").value = String(P.snap);
-  $("bLoop").classList.toggle("on", P.loop.on); $("bMetro").classList.toggle("on", P.metro);
+  $("bLoop").classList.toggle("on", P.loop.on); $("bMetro").classList.toggle("on", P.metro); $("bHarm").classList.toggle("on", harmCfg().on);
   $("detail").hidden = $("arr").hidden || !!P.hideDetail;
 }
 P = demoProject();
@@ -2744,7 +2987,7 @@ load();
   $("bLoop").classList.toggle("on", P.loop.on); $("bMetro").classList.toggle("on", P.metro);
   $("bLoop").onclick = () => { P.loop.on = !P.loop.on; $("bLoop").classList.toggle("on", P.loop.on); save(); renderArr(); };
   $("bMetro").onclick = () => { P.metro = !P.metro; $("bMetro").classList.toggle("on", P.metro); save(); };
-  $("bMidi").onclick = enableMidi;
+  $("bMidi").onclick = enableMidi; $("bHarm").onclick = harmBox; $("bHarm").classList.toggle("on", harmCfg().on);
   $("vArr").onclick = () => setView("arr"); $("vMix").onclick = () => setView("mix"); $("vInst").onclick = () => setView("inst"); $("vFx").onclick = () => setView("fx");
   $("bFull").onclick = () => { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (d.requestFullscreen) d.requestFullscreen().catch(() => toast("Vollbild ist hier nicht erlaubt.")); else toast("Vollbild ist hier nicht erlaubt."); };
   $("addSynth").onclick = () => addTrack("synth"); $("addPlanet").onclick = () => addTrack("planet"); $("addDrum").onclick = () => addTrack("drum"); $("addDrummer").onclick = () => addTrack("drummer"); $("addAudio").onclick = () => addTrack("audio");
