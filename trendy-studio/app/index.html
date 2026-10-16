@@ -206,6 +206,30 @@ input[type=range] { accent-color: var(--accent); }
 .rparts { display: flex; flex-direction: column; gap: 4px; }
 .rparts button { text-align: left; }
 
+/* FX-Station */
+#fx { position: absolute; inset: 0; display: flex; flex-direction: column; }
+#fx[hidden] { display: none; }
+#fxScroll { flex: 1; overflow: auto; padding: 10px 12px 16px; background: var(--bg); }
+.fxtabs { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-bottom: 6px; }
+.fxlab { font-size: 9.5px; font-weight: 700; color: var(--dim); letter-spacing: .1em; margin: 0 4px 0 8px; }
+.fxlab:first-child { margin-left: 0; }
+.fxtab { box-shadow: inset 0 -4px 0 var(--c); display: flex; gap: 5px; align-items: center; }
+.fxtab.on, .fxtab.on:hover { background: var(--c); }
+.fxtab small { background: var(--ink); color: var(--field); padding: 0 4px; font-size: 9.5px; }
+.fxrack { margin-top: 8px; align-items: flex-start; }
+.fxu h3, .fxadd h3 { display: flex; align-items: center; gap: 6px; }
+.fxu h3 span { flex: 1; }
+.fxu.off .fxb { opacity: .45; }
+.fxled { width: 14px; height: 10px; padding: 0; border: 1px solid var(--field); background: #5a1c14; }
+.fxled.on, .fxled.on:hover { background: #ff2a1a; }
+.fxsm { height: 16px; min-width: 18px; padding: 0 3px; font-size: 10px; background: var(--ink); color: var(--field); border: 1px solid var(--dim); }
+.fxb { flex-wrap: wrap; max-width: 420px; gap: 6px 2px; }
+.fxb .swb, .fxb .swb.on, .fxb .swb:hover { height: 19px; display: flex; align-items: center; gap: 5px; padding: 0 6px 0 5px; font-size: 10px; font-weight: 700; background: var(--c); border: 1px solid var(--ink); color: var(--ink); }
+.fxsel { height: 22px; font-size: 10.5px; }
+.fxaddg { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 3px; padding: 8px; }
+.fxaddg button { text-align: left; box-shadow: inset 5px 0 0 var(--c); padding-left: 10px; font-size: 10.5px; font-weight: 700; }
+.fxbtn { width: 88px; height: 20px; padding: 0 3px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Mischpult */
 #mix { background: var(--bg); }
 #strips { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; min-height: 0; }
@@ -237,7 +261,7 @@ input[type=range] { accent-color: var(--accent); }
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V0.8 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V0.9 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
@@ -251,7 +275,7 @@ input[type=range] { accent-color: var(--accent); }
     <div class="grp"><label>RASTER</label><select id="sSnap" aria-label="Raster"><option value="0.25">1/16</option><option value="1">1/4</option><option value="4">Takt</option></select></div>
     <div class="spacer"></div>
     <div class="grp"><button id="bMidi" title="Web MIDI einschalten">MIDI</button></div>
-    <div class="grp views"><button id="vArr" class="on">ARRANGEMENT</button><button id="vMix">MISCHPULT</button><button id="vInst">INSTRUMENT</button></div>
+    <div class="grp views"><button id="vArr" class="on">ARRANGEMENT</button><button id="vMix">MISCHPULT</button><button id="vInst">INSTRUMENT</button><button id="vFx">EFFEKTE</button></div>
     <button id="bFull" title="Vollbild">VOLLBILD</button>
   </header>
   <main id="main">
@@ -265,6 +289,7 @@ input[type=range] { accent-color: var(--accent); }
     </section>
     <section id="mix" hidden><div id="strips"></div></section>
     <section id="inst" hidden><div id="instScroll"></div></section>
+    <section id="fx" hidden><div id="fxScroll"></div></section>
   </main>
   <section id="detail"><div id="device"></div><div id="editor"></div></section>
 </div>
@@ -391,11 +416,11 @@ function makeChannel(st, dest, sends) {
   ch.hi = ctx.createBiquadFilter(); ch.hi.type = "highshelf"; ch.hi.frequency.value = 7000;
   ch.pan = ctx.createStereoPanner(); ch.fader = ctx.createGain();
   ch.split = ctx.createChannelSplitter(2); ch.aL = ctx.createAnalyser(); ch.aR = ctx.createAnalyser(); ch.aL.fftSize = ch.aR.fftSize = 512;
-  ch.input.connect(ch.lo); ch.lo.connect(ch.mid); ch.mid.connect(ch.hi); ch.hi.connect(ch.pan); ch.pan.connect(ch.fader);
+  ch.lo.connect(ch.mid); ch.mid.connect(ch.hi); ch.hi.connect(ch.pan); ch.pan.connect(ch.fader);
   ch.fader.connect(ch.split); ch.split.connect(ch.aL, 0); ch.split.connect(ch.aR, 1); ch.fader.connect(dest);
   if (sends) { ch.sA = ctx.createGain(); ch.sB = ctx.createGain(); ch.fader.connect(ch.sA); ch.fader.connect(ch.sB); ch.sA.connect(A.retIn[0]); ch.sB.connect(A.retIn[1]); }
   ch.buf = new Float32Array(512); ch.peak = [0, 0]; ch.hold = [0, 0]; ch.holdT = [0, 0];
-  st._ch = ch; return ch;
+  st._ch = ch; rebuildFx(st); return ch;
 }
 function applyChannel(st, isTrack) {
   const ch = st._ch; if (!ch) return;
@@ -410,6 +435,7 @@ function applyAll() {
   P.tracks.forEach(t => { applyChannel(t, true); if (t._inst) t._inst.apply(); });
   P.ret.forEach(r => applyChannel(r, false)); applyChannel(P.master, false);
   A.delay.delayTime.setTargetAtTime(spb() * .75, A.ctx.currentTime, .05);
+  fxRetempo();
 }
 function buildTrackAudio(tr) {
   if (!A.ctx || tr._ch) return;
@@ -421,6 +447,7 @@ function buildTrackAudio(tr) {
 function dropTrackAudio(tr) {
   if (!tr._ch) return;
   if (tr._inst && tr._inst.stop) tr._inst.stop();
+  (tr._fx || []).forEach(u => u.stop()); tr._fx = null;
   try { tr._ch.input.disconnect(); tr._ch.fader.disconnect(); } catch (e) {}
   tr._ch = null; tr._inst = null;
 }
@@ -1089,6 +1116,7 @@ function stop() {
   if (!T.playing) { T.startBeat = 0; T.cur = 0; drawPlayhead(); updatePos(0); return; }
   T.playing = false; clearInterval(T.timer); if (CLOCK) CLOCK.postMessage(0);
   if (P.clock && P.clock.on && P.clock.out) midiRaw(P.clock.out, [0xFC], A.ctx.currentTime);
+  fxReset();
   stopAudioClips(A.ctx.currentTime);
   P.tracks.forEach(t => { if (t._inst && t._inst.silence) t._inst.silence(); midiSend(t, [0xB0 | ((t.ch - 1) & 15), 123, 0], A.ctx.currentTime); });
   T.queue = []; $("bPlay").classList.remove("on"); renderEditorNow(-1);
@@ -1108,6 +1136,7 @@ function tick() {
 function scheduleStep(step, time0) {
   const time = time0, beat = step / 4, sd = spb() / 4, sw = step % 2 ? (P.swing / 50 - 1) * sd : 0;
   if (P.metro && step % 4 === 0) { const o = A.ctx.createOscillator(), g = A.ctx.createGain(); o.frequency.value = step % 16 === 0 ? 1760 : 1100; g.gain.setValueAtTime(.6, time); g.gain.setTargetAtTime(0, time + .002, .012); o.connect(g); g.connect(A.click); o.start(time); o.stop(time + .1); }
+  fxSchedule(step, time0, sd);
   if (P.clock && P.clock.on && P.clock.out) for (let k = 0; k < 6; k++) midiRaw(P.clock.out, [0xF8], time + k * sd / 6);
   for (const tr of P.tracks) {
     // Zeitversatz pro Spur (ms): negativ = früher, z. B. für träge Hardware oder Plugins mit Latenz
@@ -1386,7 +1415,7 @@ function applyProject(d) {
   P = fixDrumClips(Object.assign(demoProject(), d));
   P.master = Object.assign(master, d.master || mkStrip("Master"));
   P.ret = ret.map((r, i) => Object.assign(r, (d.ret || [])[i] || {}));
-  if (A.ctx) { P.tracks.forEach(buildTrackAudio); applyAll(); }
+  if (A.ctx) { P.tracks.forEach(buildTrackAudio); [P.master, ...P.ret].forEach(rebuildFx); applyAll(); }
   const tr = findTrack(sel.track);
   if (!tr) sel = { track: null, clip: null }; else if (!tr.clips.some(c => c.id === sel.clip)) sel.clip = null;
   syncTop(); renderArr(); renderMixer(); renderDevice(); renderEditor();
@@ -1499,6 +1528,7 @@ function menus() {
   const view = { title: IS_MAC ? "Darstellung" : "Ansicht", items: [
     { label: "Arrangement", key: { key: "Tab", label: "Tab" }, act: fromKey => setView(fromKey === true && $("mix").hidden ? "mix" : "arr"), chk: () => !$("arr").hidden },
     { label: "Instrument", key: { key: "i", label: "I" }, act: () => setView("inst"), chk: () => !$("inst").hidden },
+    { label: "Effekt-Station", key: { key: "e", label: "E" }, act: () => setView("fx"), chk: () => !$("fx").hidden },
     { label: "Mischpult", act: () => setView("mix"), chk: () => !$("mix").hidden },
     { label: "Gerät und Clip-Editor", key: { key: "e", label: "E" }, act: toggleDetail, chk: () => !P.hideDetail, en: () => !$("arr").hidden },
     "-",
@@ -1610,7 +1640,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V0.8</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V0.9</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
@@ -1656,7 +1686,7 @@ function renderDevice() {
   } else {
     title("AUDIO-SPUR", tr.name);
     const r = el("div", "drow", dv); const b = el("button", "", r, "Audiodatei laden …"); b.onclick = () => pickAudio(tr, Math.floor(T.cur / 4) * 4);
-    timingKnob(dv, tr);
+    timingKnob(dv, tr); fxSummary(dv, tr);
     el("div", "empty-ed", dv, "Datei laden oder aus dem Finder bzw. Explorer auf die Spur ziehen. Sie startet dort, wo sie losgelassen wird. Aufnehmen übers Mikrofon erlaubt die Artifact-Ansicht nicht.").style.padding = "10px 0";
     return;
   }
@@ -1669,7 +1699,7 @@ function renderDevice() {
   const sc = el("select", "", r); sc.setAttribute("aria-label", "MIDI-Kanal");
   for (let i = 1; i <= 16; i++) el("option", "", sc, "Kanal " + i).value = i;
   sc.value = tr.ch; sc.onchange = () => { tr.ch = +sc.value; save(); };
-  timingKnob(dv, tr);
+  timingKnob(dv, tr); fxSummary(dv, tr);
   const ib = el("button", tr.intern ? "on" : "", r, "Interner Klang"); ib.setAttribute("aria-pressed", tr.intern);
   ib.onclick = () => { tr.intern = !tr.intern; if (!tr.intern && tr._inst && tr._inst.silence) tr._inst.silence(); save(); renderDevice(); };
 }
@@ -2173,6 +2203,297 @@ function pickKitPreset(tr) {
     "Maschine plus Einstellung von Pegel, Stimmung, Ausklang, Panorama und Sättigung.");
 }
 
+/* ================= TRENDY FX STATION: Effekte für Elektro, House und Dub =================
+   Jede Spur, beide Rückwege (Bus A, Bus B) und die Summe haben eine eigene Effektkette (st.fx).
+   Die Kette sitzt am Kanaleingang vor dem EQ. Alle Effekte laufen mit Web-Audio-Knoten, Tempo-Effekte im Takt. */
+const SYNC = [["1/32", .125], ["1/16", .25], ["1/16 T", 1 / 6], ["1/8", .5], ["1/8 T", 1 / 3], ["1/8 P", .75], ["1/4", 1], ["1/4 P", 1.5], ["1/2", 2], ["1 Takt", 4], ["2 Takte", 8], ["4 Takte", 16]];
+const SYNC_N = SYNC.map(x => x[0]);
+const GATE_PAT = [["Trance 1", "9.99.9.99.9.9999"], ["Trance 2", "99.99.9.99.99.9."], ["Achtel", "9.9.9.9.9.9.9.9."], ["Offbeat", ".9.9.9.9.9.9.9.9"], ["Galopp", "9.99.99.9.99.99."], ["Stotter", "999.9...999.9..."], ["Dub-Hacker", "9...9..9..9.9..."], ["Sechzehntel", "9999999999999999"]];
+const PCT = v => Math.round(v * 100) + "%", HZf = v => { const h = 20 * Math.pow(2, v * 10); return h >= 1000 ? (h / 1000).toFixed(1).replace(".", ",") + "k" : Math.round(h) + ""; };
+const syncSec = i => (SYNC[i] || SYNC[6])[1] * spb();
+// Parameter: [Schlüssel, Beschriftung, Format | Optionsliste]
+const FX_TYPES = {
+  echo: { name: "TAPE-ECHO", color: "#ea6a56", add: 1, def: { time: 5, fb: .5, tone: .5, low: .25, drive: .25, wow: .15, pp: 1, mix: .35 },
+    ui: [["time", "ZEIT", SYNC_N.slice(0, 10)], ["fb", "FEEDBACK", v => Math.round(v * 102) + "%"], ["tone", "TON", HZf], ["low", "LOW CUT", v => Math.round(20 * Math.pow(2, v * 5)) + ""], ["drive", "SÄTTIG.", PCT], ["wow", "LEIERN", PCT], ["pp", "STEREO", ["MONO", "PING-PONG"]]] },
+  hall: { name: "HALL & FEDER", color: "#78c3e6", add: 1, def: { type: 1, size: .55, damp: .45, pre: .2, low: .3, mix: .3 },
+    ui: [["type", "ART", ["RAUM", "HALLE", "PLATTE", "FEDER", "KATHEDRALE"]], ["size", "GRÖSSE", PCT], ["damp", "DÄMPFUNG", PCT], ["pre", "PRE-DELAY", v => Math.round(v * 150) + "ms"], ["low", "LOW CUT", v => Math.round(20 * Math.pow(2, v * 5)) + ""]] },
+  filter: { name: "FILTER", color: "#f0cf45", def: { mode: 0, cut: .55, res: .35, slope: 1, lfo: 0, rate: 6, depth: .3, shape: 0, mix: 1 },
+    ui: [["mode", "TYP", ["TIEFPASS", "HOCHPASS", "BANDPASS"]], ["cut", "CUTOFF", HZf], ["res", "RESONANZ", PCT], ["slope", "FLANKE", ["12 dB", "24 dB"]], ["lfo", "LFO", ["AUS", "AN"]], ["rate", "TEMPO", SYNC_N], ["depth", "TIEFE", PCT], ["shape", "FORM", ["SINUS", "DREIECK", "RECHTECK", "SÄGE"]]] },
+  dj: { name: "DJ-FILTER", color: "#ff9419", def: { pos: .5, res: .3, mix: 1 },
+    ui: [["pos", "FILTER", v => v < .48 ? "TP " + HZf(v / .48) : v > .52 ? "HP " + HZf((v - .52) / .48) : "aus"], ["res", "RESONANZ", PCT]] },
+  phaser: { name: "PHASER", color: "#ad96ea", def: { rate: 10, center: .45, depth: .6, fb: .5, stages: 1, mix: .5 },
+    ui: [["rate", "TEMPO", SYNC_N], ["center", "MITTE", PCT], ["depth", "TIEFE", PCT], ["fb", "FEEDBACK", PCT], ["stages", "STUFEN", ["4", "6", "8"]]] },
+  flanger: { name: "FLANGER & CHORUS", color: "#64d3bc", def: { mode: 0, rate: 9, depth: .5, fb: .5, mix: .5 },
+    ui: [["mode", "ART", ["FLANGER", "CHORUS"]], ["rate", "TEMPO", SYNC_N], ["depth", "TIEFE", PCT], ["fb", "FEEDBACK", PCT]] },
+  drive: { name: "DRIVE", color: "#e8553c", def: { mode: 0, amt: .4, tone: .7, level: .6, mix: 1 },
+    ui: [["mode", "ART", ["RÖHRE", "TAPE", "FUZZ"]], ["amt", "DRIVE", PCT], ["tone", "TON", HZf], ["level", "PEGEL", PCT]] },
+  lofi: { name: "LO-FI", color: "#c9a173", def: { bits: .5, tone: .6, crackle: .3, wobble: .3, mix: 1 },
+    ui: [["bits", "BITS", v => Math.round(16 - v * 13) + " bit"], ["tone", "TON", HZf], ["crackle", "KNISTERN", PCT], ["wobble", "LEIERN", PCT]] },
+  comp: { name: "KOMPRESSOR", color: "#9fd36a", def: { thr: .55, ratio: .3, att: .2, rel: .35, gain: .3, mix: 1 },
+    ui: [["thr", "SCHWELLE", v => Math.round(-60 + v * 60) + " dB"], ["ratio", "RATIO", v => (1 + v * 19).toFixed(1).replace(".", ",") + ":1"], ["att", "ATTACK", v => (v * v * 100).toFixed(1).replace(".", ",") + "ms"], ["rel", "RELEASE", v => Math.round(20 + v * v * 980) + "ms"], ["gain", "AUFHOLEN", v => "+" + Math.round(v * 18) + " dB"]] },
+  pump: { name: "PUMPE", color: "#ec86bd", def: { rate: 0, depth: .7, curve: .4, mix: 1 },
+    ui: [["rate", "TAKT", ["1/4", "1/8", "1/2", "1/16"]], ["depth", "TIEFE", PCT], ["curve", "ERHOLUNG", PCT]] },
+  gate: { name: "GATE", color: "#5f5fd0", def: { pat: 0, len: .6, depth: 1, smooth: .2, mix: 1 },
+    ui: [["pat", "MUSTER", GATE_PAT.map(x => x[0].toUpperCase())], ["len", "LÄNGE", PCT], ["depth", "TIEFE", PCT], ["smooth", "WEICH", PCT]] },
+  autopan: { name: "AUTO-PAN", color: "#8fb8a0", def: { rate: 6, depth: .7, shape: 0, mix: 1 },
+    ui: [["rate", "TEMPO", SYNC_N], ["depth", "TIEFE", PCT], ["shape", "FORM", ["SINUS", "DREIECK", "RECHTECK"]]] },
+};
+const FX_SHORT = { echo: "ECHO", hall: "HALL", filter: "FILTER", dj: "DJ", phaser: "PHASER", flanger: "FLANGE", drive: "DRIVE", lofi: "LO-FI", comp: "KOMP", pump: "PUMPE", gate: "GATE", autopan: "PAN" };
+const FX_ORDER = ["echo", "hall", "filter", "dj", "phaser", "flanger", "drive", "lofi", "comp", "pump", "gate", "autopan"];
+const OSC_T = ["sine", "triangle", "square", "sawtooth"];
+const hzOf = v => 20 * Math.pow(2, v * 10);
+function curveDrive(mode, k) {
+  const c = new Float32Array(2048);
+  for (let i = 0; i < 2048; i++) {
+    const x = i / 2047 * 2 - 1;
+    c[i] = mode === 0 ? (Math.tanh(k * (x + .12)) - Math.tanh(k * .12)) / Math.tanh(k) : mode === 1 ? (k * x) / (1 + Math.abs(k * x)) * (1 + 1 / k) : Math.max(-1, Math.min(1, k * x * 1.5));
+  }
+  return c;
+}
+function hallIR(type, size, damp) {
+  const ctx = A.ctx, sr = ctx.sampleRate, len = [.7, 2.4, 1.9, 1.5, 5.5][type] * (.35 + size * 1.3), n = Math.floor(sr * len), b = ctx.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch); let y = 0, seed = 1234 + ch * 777;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x3fffffff - 1; };
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, env = Math.pow(10, -3 * t / len), a = 1 - (damp * .96) * Math.min(1, t / len * 2) - (type === 2 ? 0 : .02);
+      y += Math.max(.02, a) * (rnd() - y); d[i] = y * env * (t < .004 ? t / .004 : 1);
+    }
+    if (type === 0) for (let k = 1; k < 9; k++) { const at = Math.floor(sr * (.006 + k * .011 * (1 + ch * .13))); if (at < n) d[at] += (ch ? -.6 : .6) / k; }
+    if (type === 3) { // Federhall: dispersive „Boing“-Wiederholungen
+      const per = .031 + ch * .004;
+      for (let r = 0; r < 40; r++) { const t0 = r * per, amp = Math.pow(.8, r) * .6; let ph = 0;
+        for (let i = 0; i < sr * .028; i++) { const at = Math.floor((t0 + i / sr) * sr); if (at >= n) break; const f = 3200 * Math.pow(.08, i / (sr * .028)); ph += f / sr; d[at] += Math.sin(2 * Math.PI * ph) * amp * (1 - i / (sr * .028)); } }
+    }
+    let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i])); for (let i = 0; i < n; i++) d[i] /= pk * 3;
+  }
+  return b;
+}
+let CRACKLE = null;
+function crackleBuf() {
+  if (CRACKLE && CRACKLE.sampleRate === A.ctx.sampleRate) return CRACKLE;
+  const sr = A.ctx.sampleRate, n = sr * 4, b = A.ctx.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); let lp = 0; for (let i = 0; i < n; i++) { lp += .05 * ((Math.random() * 2 - 1) - lp); d[i] = lp * .08; if (Math.random() < 2.5 / sr * 8) { const a = (Math.random() * .8 + .2) * (Math.random() < .5 ? -1 : 1); for (let k = 0; k < 30 && i + k < n; k++) d[i + k] += a * Math.exp(-k / 4); } } }
+  return CRACKLE = b;
+}
+function lfoNode(ctx, u) { const o = ctx.createOscillator(), g = ctx.createGain(); o.connect(g); o.start(); u.oscs.push(o); return [o, g]; }
+const FX_BUILD = {
+  echo(u, ctx) {
+    const pre = ctx.createGain(), dl = ctx.createDelay(5), dr = ctx.createDelay(5), m = ctx.createChannelMerger(2), mono = ctx.createGain();
+    const loop = () => { const hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), sh = ctx.createWaveShaper(), self = ctx.createGain(), cross = ctx.createGain(); hp.type = "highpass"; lp.type = "lowpass"; hp.connect(lp); lp.connect(sh); sh.connect(self); sh.connect(cross); return { hp, lp, sh, self, cross }; };
+    const a = loop(), b = loop();
+    u.in.connect(pre); pre.connect(dl);
+    dl.connect(a.hp); a.self.connect(dl); a.cross.connect(dr);
+    dr.connect(b.hp); b.self.connect(dr); b.cross.connect(dl);
+    dl.connect(m, 0, 0); dr.connect(m, 0, 1); dl.connect(mono); mono.connect(m, 0, 1); m.connect(u.wet);
+    const [o, g] = lfoNode(ctx, u); g.connect(dl.delayTime); g.connect(dr.delayTime);
+    u.upd = (p, t) => {
+      const sec = Math.min(4.5, syncSec(p.time)), fb = p.fb * 1.02, pp = p.pp | 0;
+      dl.delayTime.setTargetAtTime(sec, t, .03); dr.delayTime.setTargetAtTime(sec, t, .03);
+      a.self.gain.setTargetAtTime(pp ? 0 : fb, t, .02); a.cross.gain.setTargetAtTime(pp ? fb : 0, t, .02); b.self.gain.setTargetAtTime(0, t, .02); b.cross.gain.setTargetAtTime(pp ? fb : 0, t, .02);
+      mono.gain.setTargetAtTime(pp ? 0 : 1, t, .02); pre.gain.value = 1;
+      [a, b].forEach(x => { x.hp.frequency.setTargetAtTime(20 * Math.pow(2, p.low * 5), t, .02); x.lp.frequency.setTargetAtTime(hzOf(.45 + p.tone * .55), t, .02); });
+      if (u.lastDr !== p.drive) { u.lastDr = p.drive; a.sh.curve = b.sh.curve = tanhCurve(1 + p.drive * 5); }
+      o.frequency.setTargetAtTime(.35 + p.wow * .9, t, .1); g.gain.setTargetAtTime(p.wow * .0035, t, .05);
+    };
+  },
+  hall(u, ctx) {
+    const hp = ctx.createBiquadFilter(), pd = ctx.createDelay(.5), cv = ctx.createConvolver(); hp.type = "highpass";
+    u.in.connect(hp); hp.connect(pd); pd.connect(cv); cv.connect(u.wet);
+    u.upd = (p, t) => {
+      hp.frequency.setTargetAtTime(20 * Math.pow(2, p.low * 5), t, .02); pd.delayTime.setTargetAtTime(p.pre * .15, t, .02);
+      const key = [p.type, Math.round(p.size * 20), Math.round(p.damp * 20)].join();
+      if (key !== u.irKey) { u.irKey = key; clearTimeout(u.irT); const go = () => { cv.buffer = hallIR(p.type | 0, p.size, p.damp); }; if (!cv.buffer) go(); else u.irT = setTimeout(go, 120); }
+    };
+  },
+  filter(u, ctx) {
+    const f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), [o, g] = lfoNode(ctx, u), byp = ctx.createGain(), thru = ctx.createGain();
+    u.in.connect(f1); f1.connect(byp); f1.connect(f2); f2.connect(thru); byp.connect(u.wet); thru.connect(u.wet); g.connect(f1.detune); g.connect(f2.detune);
+    u.upd = (p, t) => {
+      const ty = ["lowpass", "highpass", "bandpass"][p.mode | 0]; f1.type = f2.type = ty;
+      [f1, f2].forEach(f => { f.frequency.setTargetAtTime(hzOf(p.cut), t, .02); f.Q.setTargetAtTime(.5 + p.res * (p.slope ? 9 : 16), t, .02); });
+      byp.gain.setTargetAtTime(p.slope ? 0 : 1, t, .01); thru.gain.setTargetAtTime(p.slope ? 1 : 0, t, .01);
+      o.type = OSC_T[p.shape | 0]; o.frequency.setTargetAtTime(1 / syncSec(p.rate), t, .05); g.gain.setTargetAtTime(p.lfo ? p.depth * 4800 : 0, t, .03);
+    };
+  },
+  dj(u, ctx) {
+    const lp = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter(); lp.type = "lowpass"; hp.type = "highpass";
+    u.in.connect(lp); lp.connect(hp); hp.connect(u.wet);
+    u.upd = (p, t) => {
+      const q = .7 + p.res * 12;
+      lp.frequency.setTargetAtTime(p.pos < .48 ? hzOf(.25 + p.pos / .48 * .75) : 22000, t, .02); hp.frequency.setTargetAtTime(p.pos > .52 ? hzOf((p.pos - .52) / .48 * .75) : 10, t, .02);
+      lp.Q.setTargetAtTime(p.pos < .48 ? q : .7, t, .02); hp.Q.setTargetAtTime(p.pos > .52 ? q : .7, t, .02);
+    };
+  },
+  phaser(u, ctx) {
+    const aps = Array.from({ length: 8 }, () => { const f = ctx.createBiquadFilter(); f.type = "allpass"; f.Q.value = .6; return f; });
+    const [o, g] = lfoNode(ctx, u), fbD = ctx.createDelay(.01), fbG = ctx.createGain(), sum = ctx.createGain(); fbD.delayTime.value = .0003;
+    u.in.connect(sum); aps.forEach(f => g.connect(f.detune));
+    u.upd = (p, t) => {
+      const n = [4, 6, 8][p.stages | 0];
+      if (u.n !== n) { u.n = n; sum.disconnect(); aps.forEach(f => f.disconnect()); fbG.disconnect(); fbD.disconnect(); aps.forEach(f => g.connect(f.detune));
+        sum.connect(aps[0]); for (let i = 1; i < n; i++) aps[i - 1].connect(aps[i]); aps[n - 1].connect(u.wet); aps[n - 1].connect(fbD); fbD.connect(fbG); fbG.connect(sum); }
+      aps.forEach(f => f.frequency.setTargetAtTime(150 * Math.pow(2, p.center * 5), t, .02));
+      o.frequency.setTargetAtTime(1 / syncSec(p.rate), t, .05); g.gain.setTargetAtTime(p.depth * 2400, t, .03); fbG.gain.setTargetAtTime(p.fb * .85, t, .02);
+    };
+  },
+  flanger(u, ctx) {
+    const dl = ctx.createDelay(.1), dr = ctx.createDelay(.1), fl = ctx.createGain(), fr = ctx.createGain(), m = ctx.createChannelMerger(2), inv = ctx.createGain(), [o, g] = lfoNode(ctx, u);
+    u.in.connect(dl); u.in.connect(dr); dl.connect(fl); fl.connect(dl); dr.connect(fr); fr.connect(dr); dl.connect(m, 0, 0); dr.connect(m, 0, 1); m.connect(u.wet);
+    g.connect(dl.delayTime); g.connect(inv); inv.gain.value = -1; inv.connect(dr.delayTime);
+    u.upd = (p, t) => {
+      const ch = p.mode | 0, base = ch ? .018 : .0035, dep = ch ? .006 * p.depth : .003 * p.depth;
+      dl.delayTime.setTargetAtTime(base, t, .02); dr.delayTime.setTargetAtTime(base * 1.07, t, .02); g.gain.setTargetAtTime(dep, t, .03);
+      o.frequency.setTargetAtTime(1 / syncSec(p.rate), t, .05); fl.gain.setTargetAtTime(ch ? p.fb * .2 : p.fb * .88, t, .02); fr.gain.setTargetAtTime(ch ? p.fb * .2 : p.fb * .88, t, .02);
+    };
+  },
+  drive(u, ctx) {
+    const pre = ctx.createGain(), sh = ctx.createWaveShaper(), lp = ctx.createBiquadFilter(), lv = ctx.createGain(); sh.oversample = "4x"; lp.type = "lowpass";
+    u.in.connect(pre); pre.connect(sh); sh.connect(lp); lp.connect(lv); lv.connect(u.wet);
+    u.upd = (p, t) => {
+      const key = (p.mode | 0) + "|" + Math.round(p.amt * 50); if (key !== u.key) { u.key = key; sh.curve = curveDrive(p.mode | 0, 1 + p.amt * 14); }
+      pre.gain.setTargetAtTime(1 + p.amt * 2, t, .02); lp.frequency.setTargetAtTime(hzOf(.4 + p.tone * .6), t, .02); lv.gain.setTargetAtTime(p.level * 1.4 / (1 + p.amt * 1.5), t, .02);
+    };
+  },
+  lofi(u, ctx) {
+    const wd = ctx.createDelay(.05), sh = ctx.createWaveShaper(), lp = ctx.createBiquadFilter(), cg = ctx.createGain(), [o, g] = lfoNode(ctx, u); lp.type = "lowpass";
+    const src = ctx.createBufferSource(); src.buffer = crackleBuf(); src.loop = true; src.start(); u.oscs.push(src);
+    u.in.connect(wd); wd.connect(sh); sh.connect(lp); lp.connect(u.wet); src.connect(cg); cg.connect(u.wet); g.connect(wd.delayTime);
+    u.upd = (p, t) => {
+      const steps = Math.pow(2, Math.round(16 - p.bits * 13)) / 2;
+      if (u.steps !== steps) { u.steps = steps; const c = new Float32Array(4096); for (let i = 0; i < 4096; i++) { const x = i / 4095 * 2 - 1; c[i] = Math.round(x * steps) / steps; } sh.curve = c; }
+      lp.frequency.setTargetAtTime(hzOf(.4 + p.tone * .6), t, .02); cg.gain.setTargetAtTime(p.crackle * .5, t, .05);
+      wd.delayTime.setTargetAtTime(.008, t, .05); o.frequency.setTargetAtTime(.5 + p.wobble * .7, t, .1); g.gain.setTargetAtTime(p.wobble * .0025, t, .05);
+    };
+  },
+  comp(u, ctx) {
+    const c = ctx.createDynamicsCompressor(), mk = ctx.createGain(); u.in.connect(c); c.connect(mk); mk.connect(u.wet);
+    u.upd = (p, t) => { c.threshold.setTargetAtTime(-60 + p.thr * 60, t, .02); c.ratio.setTargetAtTime(1 + p.ratio * 19, t, .02); c.attack.setTargetAtTime(p.att * p.att * .1, t, .02); c.release.setTargetAtTime(.02 + p.rel * p.rel * .98, t, .02); c.knee.value = 6; mk.gain.setTargetAtTime(Math.pow(10, p.gain * 18 / 20), t, .02); };
+  },
+  pump(u, ctx) {
+    const g = ctx.createGain(); u.in.connect(g); g.connect(u.wet); u.upd = () => {};
+    u.sched = (p, step, time, sd) => {
+      const per = [4, 2, 8, 1][p.rate | 0]; if (step % per) return;
+      const len = per * sd, gg = g.gain; gg.cancelScheduledValues(time); gg.setTargetAtTime(1 - p.depth * .97, time, .003);
+      gg.setTargetAtTime(1, time + len * .06, len * (.06 + p.curve * .3));
+    };
+    u.reset = () => { g.gain.cancelScheduledValues(0); g.gain.setTargetAtTime(1, ctx.currentTime, .02); };
+  },
+  gate(u, ctx) {
+    const g = ctx.createGain(); u.in.connect(g); g.connect(u.wet); u.upd = () => {};
+    u.sched = (p, step, time, sd) => {
+      const pat = (GATE_PAT[p.pat | 0] || GATE_PAT[0])[1], on = pat[step % 16] !== ".", lo = 1 - p.depth, tc = .001 + p.smooth * .012, gg = g.gain;
+      gg.cancelScheduledValues(time);
+      if (on) { gg.setTargetAtTime(1, time, tc); gg.setTargetAtTime(lo, time + sd * (.1 + p.len * .9), tc); } else gg.setTargetAtTime(lo, time, tc);
+    };
+    u.reset = () => { g.gain.cancelScheduledValues(0); g.gain.setTargetAtTime(1, ctx.currentTime, .02); };
+  },
+  autopan(u, ctx) {
+    const pn = ctx.createStereoPanner(), [o, g] = lfoNode(ctx, u); u.in.connect(pn); pn.connect(u.wet); g.connect(pn.pan);
+    u.upd = (p, t) => { o.type = OSC_T[p.shape | 0]; o.frequency.setTargetAtTime(1 / syncSec(p.rate), t, .05); g.gain.setTargetAtTime(p.depth, t, .03); };
+  },
+};
+function fxUnit(f) {
+  const ctx = A.ctx, u = { in: ctx.createGain(), out: ctx.createGain(), dry: ctx.createGain(), wet: ctx.createGain(), oscs: [], f };
+  u.in.connect(u.dry); u.dry.connect(u.out); u.wet.connect(u.out);
+  FX_BUILD[f.type](u, ctx);
+  u.set = () => {
+    const t = ctx.currentTime, on = u.f.on !== false, p = { ...FX_TYPES[u.f.type].def, ...u.f.p }, m = p.mix ?? 1, add = FX_TYPES[u.f.type].add;
+    const dry = !on ? 1 : add ? 1 - Math.max(0, m - .5) * 2 : 1 - m, wet = !on ? 0 : add ? Math.min(1, m * 2) : m;
+    u.dry.gain.setTargetAtTime(dry, t, .015); u.wet.gain.setTargetAtTime(wet, t, .015); u.upd(p, t);
+  };
+  u.stop = () => { u.oscs.forEach(o => { try { o.stop(); } catch (e) {} }); try { u.in.disconnect(); u.out.disconnect(); } catch (e) {} };
+  u.set(); return u;
+}
+function rebuildFx(st) {
+  const ch = st._ch; if (!ch || !A.ctx) return;
+  (st._fx || []).forEach(u => u.stop());
+  try { ch.input.disconnect(); } catch (e) {}
+  st._fx = (st.fx || []).filter(f => FX_TYPES[f.type]).map(fxUnit);
+  let prev = ch.input; st._fx.forEach(u => { prev.connect(u.in); prev = u.out; }); prev.connect(ch.lo);
+}
+const fxStrips = () => [...P.tracks, ...P.ret, P.master];
+function fxSchedule(step, time, sd) {
+  for (const st of fxStrips()) if (st._fx) for (const u of st._fx) if (u.sched && u.f.on !== false) u.sched({ ...FX_TYPES[u.f.type].def, ...u.f.p }, step, time, sd);
+}
+function fxReset() { for (const st of fxStrips()) if (st._fx) st._fx.forEach(u => u.reset && u.reset()); }
+function fxRetempo() { for (const st of fxStrips()) if (st._fx) st._fx.forEach(u => u.set()); }
+const mkFx = (type, p) => ({ id: uid(), type, on: true, p: { ...FX_TYPES[type].def, ...(p || {}) } });
+const FX_CHAINS = [
+  ["Dub-Echo klassisch", "Dub", [["filter", { mode: 1, cut: .3, res: .2, slope: 0 }], ["echo", { time: 5, fb: .62, tone: .45, drive: .35, wow: .25, mix: .45 }], ["hall", { type: 3, size: .4, mix: .25 }]]],
+  ["Feder-Dub", "Dub", [["drive", { mode: 1, amt: .3, tone: .6, level: .65 }], ["hall", { type: 3, size: .55, damp: .3, mix: .45 }], ["echo", { time: 3, fb: .5, mix: .3 }]]],
+  ["Dub-Techno-Kammer", "Dub", [["filter", { mode: 0, cut: .5, res: .55, lfo: 1, rate: 10, depth: .25 }], ["echo", { time: 4, fb: .7, tone: .35, wow: .1, mix: .5 }], ["hall", { type: 1, size: .8, damp: .6, mix: .4 }]]],
+  ["Endlos-Echo", "Dub", [["echo", { time: 5, fb: .93, tone: .4, drive: .5, wow: .3, mix: .5 }]]],
+  ["Deep-House-Pumpe", "House", [["comp", { thr: .5, ratio: .25, gain: .2 }], ["pump", { rate: 0, depth: .65, curve: .45 }]]],
+  ["Filter-Fahrt", "House", [["dj", { pos: .3, res: .45 }]]],
+  ["Lo-Fi-House", "House", [["lofi", { bits: .45, tone: .45, crackle: .45, wobble: .4 }], ["comp", { thr: .45, ratio: .35, gain: .3 }], ["hall", { type: 0, size: .3, mix: .2 }]]],
+  ["Disco-Phaser", "House", [["phaser", { rate: 10, depth: .7, fb: .6, mix: .5 }], ["echo", { time: 4, fb: .3, mix: .2 }]]],
+  ["Bus-Kleber", "Bus", [["comp", { thr: .6, ratio: .12, att: .45, rel: .4, gain: .15 }], ["drive", { mode: 1, amt: .15, tone: .85, level: .62 }]]],
+  ["Röhren-Wärme", "Bus", [["drive", { mode: 0, amt: .3, tone: .7, level: .6 }]]],
+  ["Elektro-Flanger", "Elektro", [["flanger", { mode: 0, rate: 10, depth: .7, fb: .7, mix: .5 }]]],
+  ["Trance-Gate", "Elektro", [["gate", { pat: 0, len: .6, depth: 1 }], ["echo", { time: 3, fb: .35, mix: .25 }]]],
+  ["Acid-Säure", "Elektro", [["drive", { mode: 2, amt: .45, tone: .65, level: .5 }], ["echo", { time: 4, fb: .45, mix: .3 }]]],
+  ["Breiter Chor", "Elektro", [["flanger", { mode: 1, rate: 9, depth: .6, fb: .1, mix: .45 }], ["hall", { type: 2, size: .5, mix: .25 }]]],
+  ["Auto-Pan Dub", "Dub", [["autopan", { rate: 8, depth: .8 }], ["echo", { time: 5, fb: .55, mix: .35 }]]],
+  ["Kathedrale", "Raum", [["hall", { type: 4, size: .8, damp: .5, pre: .35, mix: .5 }]]],
+].map(([name, cat, fx]) => ({ name, cat, fx }));
+
+/* ================= FX-Station Bedienfeld ================= */
+let fxSel = null; // Spur-ID, "ret0", "ret1" oder "master"
+const fxStripOf = k => k === "master" ? P.master : k === "ret0" ? P.ret[0] : k === "ret1" ? P.ret[1] : findTrack(k);
+const fxKeyOf = st => st === P.master ? "master" : st === P.ret[0] ? "ret0" : st === P.ret[1] ? "ret1" : st.id;
+function openFx(st) { fxSel = fxKeyOf(st); setView("fx"); }
+function fxChanged(st, rebuild) { if (rebuild) rebuildFx(st); save(); renderMixer(); if (!$("fx").hidden) renderFx(); }
+function renderFx() {
+  const box = $("fxScroll"); box.innerHTML = "";
+  if (!fxSel || !fxStripOf(fxSel)) fxSel = sel.track && findTrack(sel.track) ? sel.track : "ret1";
+  const st = fxStripOf(fxSel);
+  const top = el("div", "jtop", box);
+  el("div", "jbrand", top, "TRENDY FX STATION<small>EFFEKTE FÜR ELEKTRO, HOUSE UND DUB · ALS SPUR- ODER BUSEFFEKT</small>");
+  const kp = el("button", "on", top, "KETTEN-PRESETS · " + FX_CHAINS.length);
+  kp.onclick = () => presetBrowser("FX-STATION · KETTEN", FX_CHAINS, x => { st.fx = x.fx.map(([t, p]) => mkFx(t, p)); fxChanged(st, true); }, "Ersetzt die Kette von „" + st.name + "“. Auf Bus B (Echo) und Bus A (Hall) wirken sie für alle Spuren, die dorthin senden.");
+  const clr = el("button", "", top, "Kette leeren"); clr.onclick = () => { st.fx = []; fxChanged(st, true); };
+  // Ziel wählen: Spuren als Spureffekt, Busse und Summe als Buseffekt
+  const tabs = el("div", "fxtabs", box);
+  const tab = (k, s, label, color) => { const b = el("button", "fxtab" + (k === fxSel ? " on" : ""), tabs); b.style.setProperty("--c", color); b.textContent = label; const n = (s.fx || []).length; if (n) el("small", "", b, String(n)); b.onclick = () => { fxSel = k; renderFx(); }; };
+  el("span", "fxlab", tabs, "SPUREN");
+  P.tracks.forEach(t => tab(t.id, t, t.name, t.color));
+  el("span", "fxlab", tabs, "BUSSE");
+  tab("ret0", P.ret[0], "Bus A · " + P.ret[0].name.replace(/^A /, ""), "#a9c3cf"); tab("ret1", P.ret[1], "Bus B · " + P.ret[1].name.replace(/^B /, ""), "#a9c3cf"); tab("master", P.master, "Summe", "#d9b98a");
+  const isBus = fxSel === "ret0" || fxSel === "ret1" || fxSel === "master";
+  el("p", "tnote", box, isBus ? (fxSel === "master" ? "Summeneffekt: wirkt auf den ganzen Mix." : "Buseffekt: wirkt auf alles, was die Spuren über ihren Send " + (fxSel === "ret0" ? "A" : "B") + " schicken. Send-Regler im Mischpult.") : "Spureffekt: wirkt nur auf „" + st.name + "“. Für Hall und Echo auf mehreren Spuren lieber einen Bus nehmen.");
+  const rack = el("div", "jp fxrack", box);
+  (st.fx || []).forEach((f, i) => {
+    const T = FX_TYPES[f.type], p = f.p = { ...T.def, ...f.p };
+    const s = el("div", "jsec fxu" + (f.on === false ? " off" : ""), rack); s.style.setProperty("--c", T.color);
+    const h = el("h3", "", s); const led = el("button", "fxled" + (f.on !== false ? " on" : ""), h); led.title = "Ein/Aus"; led.setAttribute("aria-label", T.name + " ein/aus"); led.setAttribute("aria-pressed", f.on !== false);
+    led.onclick = () => { f.on = f.on === false; fxChanged(st, false); if (st._fx && st._fx[i]) st._fx[i].set(); };
+    el("span", "", h).textContent = (i + 1) + " · " + T.name;
+    const mv = (d) => { const j = i + d; if (j < 0 || j >= st.fx.length) return; [st.fx[i], st.fx[j]] = [st.fx[j], st.fx[i]]; fxChanged(st, true); };
+    const bl = el("button", "fxsm", h, "◀"); bl.setAttribute("aria-label", "nach links"); bl.onclick = () => mv(-1);
+    const br = el("button", "fxsm", h, "▶"); br.setAttribute("aria-label", "nach rechts"); br.onclick = () => mv(1);
+    const bx = el("button", "fxsm", h, "×"); bx.setAttribute("aria-label", "entfernen"); bx.onclick = () => { st.fx.splice(i, 1); fxChanged(st, true); };
+    const body = el("div", "jbody fxb", s);
+    const upd = () => { save(); const u = st._fx && st._fx[i]; if (u) u.set(); };
+    T.ui.forEach(([k, label, fmt]) => {
+      if (Array.isArray(fmt)) {
+        if (fmt.length > 5) { const w = el("div", "swg", body); el("b", "", w, label); const sl = el("select", "fxsel", w); sl.setAttribute("aria-label", label); fmt.forEach((t, j) => el("option", "", sl, t).value = j); sl.value = p[k]; sl.onchange = () => { p[k] = +sl.value; upd(); }; }
+        else { const w = el("div", "swg", body); el("b", "", w, label); const bs = fmt.map((t, j) => { const b = el("button", "swb", w, "<i></i>"); b.appendChild(document.createTextNode(t)); b.onclick = () => { p[k] = j; upd(); bs.forEach((x, m) => x.classList.toggle("on", m === j)); }; return b; }); bs.forEach((x, m) => x.classList.toggle("on", m === (p[k] | 0))); }
+      } else knob(body, { label, def: T.def[k], get: () => p[k], set: v => { p[k] = v; upd(); }, fmt: () => fmt(p[k]) });
+    });
+    knob(body, { label: "MIX", def: T.def.mix, get: () => p.mix, set: v => { p.mix = v; upd(); }, fmt: () => p.mix >= .995 ? "100%" : PCT(p.mix) });
+  });
+  const add = el("div", "jsec fxadd", rack); add.style.setProperty("--c", "#ece6d6"); el("h3", "", add, "+ EFFEKT EINFÜGEN");
+  const ag = el("div", "fxaddg", add);
+  FX_ORDER.forEach(t => { const b = el("button", "", ag); b.style.setProperty("--c", FX_TYPES[t].color); b.textContent = FX_TYPES[t].name; b.onclick = () => { if (!st.fx) st.fx = []; if (st.fx.length >= 8) { toast("Höchstens 8 Effekte pro Kette."); return; } st.fx.push(mkFx(t)); fxChanged(st, true); }; });
+  el("div", "", box, "<p style='color:var(--dim);margin:8px 0 0'>Die Reihenfolge zählt: Signal läuft von links nach rechts. LED schaltet einen Effekt stumm, ◀ ▶ verschiebt ihn. Echo und Hall mischen bis MIX 50 % dazu und werden darüber immer nasser, auf einem Bus also MIX 100 % stellen. Zeiten und LFOs laufen im Projekttempo.</p>");
+}
+function fxSummary(parent, st) {
+  const r = el("div", "drow", parent); el("span", "", r, "EFFEKTE");
+  el("span", "tnote", r).textContent = (st.fx || []).length ? st.fx.map(f => FX_TYPES[f.type] ? FX_TYPES[f.type].name : f.type).join(" › ") : "keine";
+  const b = el("button", "", r, "Effekt-Station"); b.onclick = () => openFx(st);
+}
+
 /* ================= Clip-Editor (rechts unten) ================= */
 const ROWB = [
   { key: "vel", btn: "Lautstärke", fmt: v => String(Math.max(1, Math.round(v * 127))), def: .8 },
@@ -2303,6 +2624,9 @@ function strip(box, st, type) {
   const dbf = v => (v > 0 ? "+" : "") + Math.round(v);
   chKnob(eq, st, "hi", "HOCH", -15, 15, () => dbf(st.hi), isTrack); chKnob(eq, st, "mid", "MITTE", -15, 15, () => dbf(st.mid), isTrack); chKnob(eq, st, "lo", "TIEF", -15, 15, () => dbf(st.lo), isTrack);
   if (isTrack) { const se = el("div", "sec", s, "<b>SENDS</b>"); chKnob(se, st, "sA", "A", 0, 1, () => Math.round(st.sA * 100) + "", true); chKnob(se, st, "sB", "B", 0, 1, () => Math.round(st.sB * 100) + "", true); }
+  const fxs = el("div", "sec", s, "<b>FX</b>"), fxb = el("button", "fxbtn" + ((st.fx || []).length ? " on" : ""), fxs);
+  fxb.textContent = (st.fx || []).length ? (st.fx || []).map(f => FX_SHORT[f.type] || "?").slice(0, 2).join(" ") + ((st.fx.length > 2) ? " +" + (st.fx.length - 2) : "") : "+ Effekt";
+  fxb.title = "Effekt-Station öffnen"; fxb.onclick = () => openFx(st);
   const pn = el("div", "sec", s, "<b>PAN</b>");
   chKnob(pn, st, "pan", "", -1, 1, () => st.pan === 0 ? "C" : (st.pan < 0 ? "L" : "R") + Math.round(Math.abs(st.pan) * 50), isTrack, 30);
   const fz = el("div", "fz", s);
@@ -2390,9 +2714,9 @@ function frame() {
   requestAnimationFrame(frame);
 }
 function setView(v) {
-  $("arr").hidden = v !== "arr"; $("mix").hidden = v !== "mix"; $("inst").hidden = v !== "inst"; $("detail").hidden = v !== "arr" || !!P.hideDetail;
-  [["vArr", "arr"], ["vMix", "mix"], ["vInst", "inst"]].forEach(([id, k]) => { $(id).classList.toggle("on", v === k); $(id).setAttribute("aria-pressed", v === k); });
-  if (v === "mix") { renderMixer(); requestAnimationFrame(layoutMeters); } else if (v === "inst") renderInst(); else renderArr();
+  $("arr").hidden = v !== "arr"; $("mix").hidden = v !== "mix"; $("inst").hidden = v !== "inst"; $("fx").hidden = v !== "fx"; $("detail").hidden = v !== "arr" || !!P.hideDetail;
+  [["vArr", "arr"], ["vMix", "mix"], ["vInst", "inst"], ["vFx", "fx"]].forEach(([id, k]) => { $(id).classList.toggle("on", v === k); $(id).setAttribute("aria-pressed", v === k); });
+  if (v === "mix") { renderMixer(); requestAnimationFrame(layoutMeters); } else if (v === "inst") renderInst(); else if (v === "fx") renderFx(); else renderArr();
   try { localStorage.setItem("trendy-studio-view", v); } catch (e) {}
 }
 
@@ -2421,7 +2745,7 @@ load();
   $("bLoop").onclick = () => { P.loop.on = !P.loop.on; $("bLoop").classList.toggle("on", P.loop.on); save(); renderArr(); };
   $("bMetro").onclick = () => { P.metro = !P.metro; $("bMetro").classList.toggle("on", P.metro); save(); };
   $("bMidi").onclick = enableMidi;
-  $("vArr").onclick = () => setView("arr"); $("vMix").onclick = () => setView("mix"); $("vInst").onclick = () => setView("inst");
+  $("vArr").onclick = () => setView("arr"); $("vMix").onclick = () => setView("mix"); $("vInst").onclick = () => setView("inst"); $("vFx").onclick = () => setView("fx");
   $("bFull").onclick = () => { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (d.requestFullscreen) d.requestFullscreen().catch(() => toast("Vollbild ist hier nicht erlaubt.")); else toast("Vollbild ist hier nicht erlaubt."); };
   $("addSynth").onclick = () => addTrack("synth"); $("addPlanet").onclick = () => addTrack("planet"); $("addDrum").onclick = () => addTrack("drum"); $("addDrummer").onclick = () => addTrack("drummer"); $("addAudio").onclick = () => addTrack("audio");
   $("zIn").onclick = () => { P.ppb = Math.min(80, Math.round(P.ppb * 1.4)); save(); renderArr(); };
@@ -2440,7 +2764,7 @@ load();
   buildMenubar(); syncTop(); hist.last = JSON.stringify(P, strip_);
   renderArr(); renderMixer(); renderDevice(); renderEditor(); updatePos(0);
   let v = "arr"; try { v = localStorage.getItem("trendy-studio-view") || "arr"; } catch (e) {}
-  if (v === "mix" || v === "inst") setView(v);
+  if (v === "mix" || v === "inst" || v === "fx") setView(v);
   requestAnimationFrame(frame);
 })();
 </script>
