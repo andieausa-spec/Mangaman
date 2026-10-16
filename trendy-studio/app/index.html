@@ -264,7 +264,7 @@ input[type=range] { accent-color: var(--accent); }
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V1.0 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V1.1 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
@@ -1074,7 +1074,7 @@ function setInstrument(tr, kind) {
    Synth-Spuren ziehen nach: Flächen spielen den passenden Akkord, Bass und Melodie behalten Rhythmus und Kontur.
    Jeder Clip merkt sich deine letzte eigene Eingabe (c.ho); angepasst wird immer von dort aus, nichts driftet weg. */
 const HARM_STYLES = ["House", "Dub", "Electro"];
-const HARM = { skip: false };
+const HARM = { skip: false, edited: new Set() };
 const HARM_THEMES = [
   // [Stil, Name, Stufen (0 = Grundton der Tonart), Takte pro Akkord]
   [0, "Deep Night", [0, 5, 2, 6], 1], [0, "Garage Soul", [0, 3], 2], [0, "Sunrise", [5, 6, 0, 0], 1], [0, "Lounge Drift", [0, 2, 3, 5], 1],
@@ -1195,12 +1195,12 @@ function adaptClip(c, T, role, style, rnd, weird, keepOwn) {
 function sigClip(c) { return JSON.stringify([c.start, c.len, c.oct, c.s.on, c.s.pitch, c.s.chd]); }
 function trackSig(t) { return t && t.kind === "synth" ? JSON.stringify((t.clips || []).filter(c => c.s).map(c => [c.id, c.start, c.len, c.oct, c.s.on, c.s.pitch, c.s.chd]).sort()) : ""; }
 // Folgespuren an einen Harmonieplan anpassen; Clips, über denen die Harmonie innerhalb wechselt, werden taktweise geteilt
-function applyHarmony(map, followers, keepOwn) {
+function applyHarmony(map, followers, keepOwn, skip) {
   const h = harmCfg(), names = [];
   for (const tr of followers) {
     const before = trackSig(tr), role = harmRole(tr), out = [];
     for (const c of tr.clips) {
-      if (!c.s) { out.push(c); continue; }
+      if (!c.s || (skip && skip.has(c.id))) { out.push(c); continue; }
       if (!c.ho) harmMark(c);
       const s0 = Math.round(c.start * 4), nb = Math.max(1, Math.ceil(c.len / 4 - 1e-9)), sigs = [];
       for (let k = 0; k < nb; k++) { const t = []; for (let i = 0; i < 16; i++) { const a = s0 + 16 * k + i; t.push(a < Math.round((c.start + c.len) * 4) && map.has(a) ? map.get(a) : "x"); } sigs.push(t.join(",")); }
@@ -1236,24 +1236,66 @@ function harmPrep(prevTxt) {
   if (!prev || prev.root !== P.root || prev.scale !== P.scale || !Array.isArray(prev.tracks)) return null;
   const pt = new Map(prev.tracks.map(t => [t.id, t]));
   const changed = P.tracks.filter(t => t.kind === "synth" && trackSig(t) !== trackSig(pt.get(t.id) || { kind: "synth", clips: [] }));
+  HARM.edited = new Set();
   // Was du von Hand änderst, wird zur neuen eigenen Fassung dieser Clips
-  changed.forEach(t => { const pc = new Map(((pt.get(t.id) || {}).clips || []).map(c => [c.id, c])); t.clips.forEach(c => { const o = pc.get(c.id); if (c.s && (!o || !o.s || sigClip(o) !== sigClip(c))) harmMark(c); }); });
+  changed.forEach(t => { const pc = new Map(((pt.get(t.id) || {}).clips || []).map(c => [c.id, c])); t.clips.forEach(c => { const o = pc.get(c.id); if (c.s && (!o || !o.s || sigClip(o) !== sigClip(c))) { harmMark(c); HARM.edited.add(c.id); } }); });
   return changed.length ? changed : null;
 }
 function harmRun(changed) {
   const h = harmCfg(); let L;
   if (h.lead !== "auto") { L = findTrack(h.lead); if (!L || !changed.includes(L)) return; }
   else L = changed.find(t => t.id === sel.track) || changed[0];
-  harmonizeFrom(L, false);
+  harmonizeFrom(L, false, HARM.edited);
 }
-function harmonizeFrom(L, loud) {
+function harmonizeFrom(L, loud, edited) {
   const h = harmCfg(), map = leaderMap(L);
   // Leitfaden (gewähltes Thema): Passt der Ton der führenden Spur in den geplanten Akkord, bleibt der Plan
   if (h.plan) map.forEach((r, a) => { const pr = h.plan[Math.floor(a / 16)]; if (pr != null && pr !== r && chordPcs(pr, styleChord(pr, h.style)).has(degPc(r))) map.set(a, pr); });
   const names = map.size ? applyHarmony(map, harmFollowers(L), true) : [];
+  if (map.size && edited && edited.size && h.smooth !== false) harmTransitions(L, map, edited).forEach(n => { if (!names.includes(n)) names.push(n); });
   harmCommit(); harmRefresh();
   if (names.length) toast("KI-Harmonie (" + HARM_STYLES[h.style] + "): " + names.join(", ") + " " + (names.length > 1 ? "folgen" : "folgt") + " jetzt „" + L.name + "“. Gefällt’s nicht: " + MOD + "Z.");
   else if (loud) toast(map.size ? "Alles passt schon zu „" + L.name + "“." : "„" + L.name + "“ hat keine Noten, an die sich etwas anpassen könnte.");
+}
+// Grundton eines halben Takts: Leitfaden, sonst das, was gerade klingt (Bass zuerst, dann Fläche, dann Melodie)
+function harmRootAt(hb, map) {
+  const h = harmCfg();
+  if (map && map.has(hb * 8)) return map.get(hb * 8);
+  if (h.plan && h.plan[Math.floor(hb / 2)] != null) return h.plan[Math.floor(hb / 2)];
+  for (const role of ["bass", "pad", "lead"]) for (const t of P.tracks) {
+    if (t.kind !== "synth" || harmRole(t) !== role) continue;
+    const c = t.clips.find(c => c.s && hb * 2 >= c.start && hb * 2 < c.start + c.len); if (!c) continue;
+    const r = harmRoots(c.s, c.oct || 0)[((hb * 8 - Math.round(c.start * 4)) % 16 + 16) % 16 < 8 ? 0 : 1]; if (r != null) return r;
+  }
+  return null;
+}
+/* Übergänge: Der Teil davor leitet im letzten halben Takt mit der Dominante in den geänderten Teil über,
+   und am Ende des geänderten Teils leiten die anderen Spuren in den nächsten Teil über. So bleibt der ganze Track rund. */
+function harmTransitions(L, map, edited) {
+  const h = harmCfg(), n = harmN(), pcs = harmPcs(), names = [];
+  const ok = r => pcs.has((degPc(r) + 7) % 12);
+  const dom = r => { for (const k of [4, 3, 6]) { const d = (r + k) % n; if (ok(d)) return d; } return null; };
+  const halves = [...new Set(L.clips.filter(c => edited.has(c.id) && c.s).flatMap(c => { const o = []; for (let a = Math.round(c.start * 4); a < Math.round((c.start + c.len) * 4); a += 8) o.push(Math.floor(a / 8)); return o; }))].sort((a, b) => a - b);
+  if (!halves.length) return names;
+  const regions = []; halves.forEach(x => { const r = regions[regions.length - 1]; if (r && x === r[1] + 1) r[1] = x; else regions.push([x, x]); });
+  const bar = (tm, hb, root) => { const b = Math.floor(hb / 2); for (let i = 0; i < 16; i++) { const a = b * 16 + i, hh = Math.floor(a / 8); tm.set(a, hh === hb ? root : harmRootAt(hh, map)); } };
+  const tracksAll = P.tracks.filter(t => t.kind === "synth" && !h.lock[t.id] && t.clips.length);
+  for (const [h0, h1] of regions) {
+    const rn = map.get(h0 * 8), rl = map.get(h1 * 8);
+    // davor: Ziel ankündigen
+    const hp = h0 - 1, rp = hp >= 0 && !halves.includes(hp) ? harmRootAt(hp) : null, dp = rn != null ? dom(rn) : null;
+    if (rp != null && rn != null && rp !== rn && dp != null && dp !== rp && ((rn - rp) % n + n) % n !== 3) {
+      const tm = new Map(); bar(tm, hp, dp);
+      applyHarmony(tm, tracksAll, false, edited).forEach(x => names.push(x));
+    }
+    // danach: am Ende des geänderten Teils in den nächsten Teil überleiten (nur die folgenden Spuren, deine Eingabe bleibt)
+    const hx = h1 + 1, rx = harmRootAt(hx), dx = rx != null ? dom(rx) : null;
+    if (h1 > h0 && rx != null && rl != null && rl !== rx && dx != null && dx !== rl && ((rx - rl) % n + n) % n !== 3 && P.tracks.some(t => t.kind === "synth" && t.clips.some(c => c.s && hx * 2 >= c.start && hx * 2 < c.start + c.len))) {
+      const tm = new Map(); bar(tm, h1, dx);
+      applyHarmony(tm, harmFollowers(L), false, edited).forEach(x => names.push(x));
+    }
+  }
+  return names;
 }
 function harmBars() {
   if (P.loop.on && P.loop.end > P.loop.start) return [Math.floor(P.loop.start / 4), Math.ceil(P.loop.end / 4)];
@@ -1292,6 +1334,9 @@ function harmBox() {
   ls.value = h.lead === "auto" || findTrack(h.lead) ? h.lead : "auto"; ls.onchange = () => { h.lead = ls.value; save(); };
   const go = el("button", "on", r4, "Jetzt anpassen");
   go.onclick = () => { const L = findTrack(h.lead) || (findTrack(sel.track) && findTrack(sel.track).kind === "synth" ? findTrack(sel.track) : P.tracks.find(t => t.kind === "synth" && harmRole(t) === "bass") || P.tracks.find(t => t.kind === "synth")); if (L) harmonizeFrom(L, true); };
+  const r8 = row("ÜBERGÄNGE"); const sm = el("button", h.smooth !== false ? "on" : "", r8, h.smooth !== false ? "An" : "Aus");
+  sm.onclick = () => { h.smooth = h.smooth === false; save(); harmBox(); };
+  el("span", "tnote", r8, "Teile davor und danach leiten sanft in deine Änderung hinein und wieder hinaus.");
   const r5 = row("FOLGEN");
   P.tracks.filter(t => t.kind === "synth").forEach(t => { const x = el("button", h.lock[t.id] ? "" : "on", r5, t.name + " · " + { pad: "Fläche", bass: "Bass", lead: "Melodie" }[harmRole(t)]); x.title = "Passt sich an / bleibt wie sie ist"; x.onclick = () => { if (h.lock[t.id]) delete h.lock[t.id]; else h.lock[t.id] = true; save(); harmBox(); }; });
   el("p", "tnote", b, "Ausgeschaltete Spuren bleiben unangetastet, können aber weiter führen. Schlagzeug und Audio bleiben immer wie sie sind.");
@@ -1883,7 +1928,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.0</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.1</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
