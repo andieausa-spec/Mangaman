@@ -22,7 +22,7 @@ jobs:
           node-version: 20
       - name: Abhängigkeiten
         run: npm install --no-audit --no-fund
-      - name: App bauen (Universal: Apple Silicon + Intel)
+      - name: "App bauen (Universal: Apple Silicon + Intel)"
         run: npx electron-builder --mac dir --universal --publish never
       - name: Ad-hoc signieren und DMG erstellen
         run: |
