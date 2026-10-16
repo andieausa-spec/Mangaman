@@ -264,7 +264,7 @@ input[type=range] { accent-color: var(--accent); }
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V1.2 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V1.3 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
@@ -1074,7 +1074,7 @@ function setInstrument(tr, kind) {
    Synth-Spuren ziehen nach: Flächen spielen den passenden Akkord, Bass und Melodie behalten Rhythmus und Kontur.
    Jeder Clip merkt sich deine letzte eigene Eingabe (c.ho); angepasst wird immer von dort aus, nichts driftet weg. */
 const HARM_STYLES = ["House", "Dub", "Electro"];
-const HARM = { skip: false, edited: new Set() };
+const HARM = { skip: false, edited: new Set(), dEdited: new Set(), dTracks: [] };
 const HARM_THEMES = [
   // [Stil, Name, Stufen (0 = Grundton der Tonart), Takte pro Akkord]
   [0, "Deep Night", [0, 5, 2, 6], 1], [0, "Garage Soul", [0, 3], 2], [0, "Sunrise", [5, 6, 0, 0], 1], [0, "Lounge Drift", [0, 2, 3, 5], 1],
@@ -1129,8 +1129,8 @@ function harmRole(tr) {
   if (/bass/i.test(tr.name) || (!/lead|melod|arp/i.test(tr.name) && tr.clips.every(c => (c.oct || 0) <= 0))) return "bass";
   return "lead";
 }
-const harmBase = c => c.ho && c.ho.on && c.ho.on.length === 16 ? c.ho : c.s;
-const harmMark = c => { if (c.s) c.ho = { on: c.s.on.slice(), pitch: c.s.pitch.slice(), chd: (c.s.chd || Array(16).fill(0)).slice() }; };
+const harmBase = c => c.hm && c.hm.on && c.hm.on.length === 16 ? c.hm : c.ho && c.ho.on && c.ho.on.length === 16 ? c.ho : c.s;
+const harmMark = c => { delete c.hm; if (c.s) c.ho = { on: c.s.on.slice(), pitch: c.s.pitch.slice(), chd: (c.s.chd || Array(16).fill(0)).slice() }; };
 // Harmonieplan der führenden Spur: absoluter 16tel-Schritt -> Stufe
 function leaderMap(tr) {
   const map = new Map();
@@ -1153,7 +1153,7 @@ function themeMap(th, bars) {
 }
 function adaptClip(c, T, role, style, rnd, weird, keepOwn) {
   const base = harmBase(c), n = harmN(), N = 2 * n, s = c.s, own = harmRoots({ ...s, on: base.on, pitch: base.pitch, chd: base.chd }, c.oct || 0);
-  for (let i = 0; i < 16; i++) { s.on[i] = base.on[i]; s.pitch[i] = base.pitch[i]; if (s.chd) s.chd[i] = base.chd[i] || 0; }
+  for (let i = 0; i < 16; i++) { s.on[i] = base.on[i]; s.pitch[i] = base.pitch[i]; if (s.chd) s.chd[i] = base.chd[i] || 0; if (base.vel) { s.vel[i] = base.vel[i]; s.len[i] = base.len[i]; } }
   if (!s.chd) s.chd = Array(16).fill(0);
   if (role === "pad") {
     // Gehaltene Flächen schlagen beim Akkordwechsel neu an
@@ -1236,25 +1236,33 @@ function harmPrep(prevTxt) {
   let prev; try { prev = JSON.parse(prevTxt); } catch (e) { return null; }
   if (!prev || prev.root !== P.root || prev.scale !== P.scale || !Array.isArray(prev.tracks)) return null;
   const pt = new Map(prev.tracks.map(t => [t.id, t]));
+  HARM.dEdited = new Set(); HARM.dTracks = [];
   // Deine Änderungen an Drum-Clips werden ihre neue eigene Fassung
-  P.tracks.forEach(t => { if (t.kind !== "drum") return; const pc = new Map(((pt.get(t.id) || {}).clips || []).map(c => [c.id, c])); t.clips.forEach(c => { const o = pc.get(c.id); if (c.lanes && (!o || JSON.stringify(o.lanes) !== JSON.stringify(c.lanes))) c.hd = JSON.parse(JSON.stringify(c.lanes)); if (c.dr && (!o || JSON.stringify(o.dr) !== JSON.stringify(c.dr))) c.hdr = { cx: c.dr.cx, ld: c.dr.ld, fill: c.dr.fill }; }); });
+  P.tracks.forEach(t => { if (t.kind !== "drum") return; const pc = new Map(((pt.get(t.id) || {}).clips || []).map(c => [c.id, c])); t.clips.forEach(c => { const o = pc.get(c.id); if (c.lanes && (!o || JSON.stringify(o.lanes) !== JSON.stringify(c.lanes))) { c.hd = JSON.parse(JSON.stringify(c.lanes)); delete c.hdm; HARM.dEdited.add(c.id); if (!HARM.dTracks.includes(t)) HARM.dTracks.push(t); } if (c.dr && (!o || JSON.stringify(o.dr) !== JSON.stringify(c.dr))) c.hdr = { cx: c.dr.cx, ld: c.dr.ld, fill: c.dr.fill }; }); });
   const changed = P.tracks.filter(t => t.kind === "synth" && trackSig(t) !== trackSig(pt.get(t.id) || { kind: "synth", clips: [] }));
   HARM.edited = new Set();
   // Was du von Hand änderst, wird zur neuen eigenen Fassung dieser Clips
   changed.forEach(t => { const pc = new Map(((pt.get(t.id) || {}).clips || []).map(c => [c.id, c])); t.clips.forEach(c => { const o = pc.get(c.id); if (c.s && (!o || !o.s || sigClip(o) !== sigClip(c))) { harmMark(c); HARM.edited.add(c.id); } }); });
-  return changed.length ? changed : null;
+  return changed.length || HARM.dTracks.length ? changed : null;
 }
 function harmRun(changed) {
   const h = harmCfg(); let L;
+  // Drum-Clip geändert: Nachbar-Parts derselben Drum-Spur ziehen mit
+  if (HARM.dTracks.length) {
+    const nm = [];
+    HARM.dTracks.forEach(t => { if (neighborsFollow(t, HARM.dEdited)) nm.push("die Parts davor und danach"); synthFollowDrums(t, HARM.dEdited).forEach(x => { if (!nm.includes(x)) nm.push(x); }); });
+    if (!changed.length) { if (nm.length) { harmCommit(); harmRefresh(); toast("KI-Rhythmus: " + nm.join(", ") + " " + (nm.length > 1 ? "reagieren" : "reagiert") + " auf „" + HARM.dTracks[0].name + "“. Gefällt’s nicht: " + MOD + "Z."); } return; }
+  }
   if (h.lead !== "auto") { L = findTrack(h.lead); if (!L || !changed.includes(L)) return; }
   else L = changed.find(t => t.id === sel.track) || changed[0];
   harmonizeFrom(L, false, HARM.edited);
 }
 function harmonizeFrom(L, loud, edited) {
-  const h = harmCfg(), map = leaderMap(L);
+  const h = harmCfg(), moved = edited && edited.size ? neighborsFollow(L, edited) : false, map = leaderMap(L);
   // Leitfaden (gewähltes Thema): Passt der Ton der führenden Spur in den geplanten Akkord, bleibt der Plan
   if (h.plan) map.forEach((r, a) => { const pr = h.plan[Math.floor(a / 16)]; if (pr != null && pr !== r && chordPcs(pr, styleChord(pr, h.style)).has(degPc(r))) map.set(a, pr); });
   const names = map.size ? applyHarmony(map, harmFollowers(L), true) : [];
+  if (moved) names.unshift("die Parts davor und danach");
   if (map.size && edited && edited.size && h.smooth !== false) harmTransitions(L, map, edited).forEach(n => { if (!names.includes(n)) names.push(n); });
   if (map.size) {
     const bars = new Set(), fills = new Set(), crashes = new Set();
@@ -1364,14 +1372,111 @@ function drumFollow(bars, fills, crashes) {
       const snap0 = JSON.stringify(c, strip_);
       runs.forEach((ru, j) => {
         let p = c;
-        if (runs.length > 1 && j) { p = JSON.parse(snap0); p.id = uid(); p.start = c.start + 4 * ru.b; p.hd = JSON.parse(JSON.stringify(c.hd)); }
+        if (runs.length > 1 && j) { p = JSON.parse(snap0); p.id = uid(); p.start = c.start + 4 * ru.b; p.hd = JSON.parse(JSON.stringify(c.hd)); if (c.hdm) p.hdm = JSON.parse(JSON.stringify(c.hdm)); }
         p._newLen = Math.min(4 * (ru.e - ru.b), c.start + c.len - (c.start + 4 * ru.b)); out.push(p);
-        if (ru.g !== "x") { p.lanes = JSON.parse(JSON.stringify(c.hd)); const [info, fill, crash] = JSON.parse(ru.g); drumBarAdapt(p.lanes, info || { bass: Array(16).fill(0), energy: -1 }, fill, crash, harmRng(h.seed ^ hashStr(tr.id + ":" + p.start)), h.weird); }
+        if (ru.g !== "x") { p.lanes = JSON.parse(JSON.stringify(c.hdm || c.hd)); const [info, fill, crash] = JSON.parse(ru.g); drumBarAdapt(p.lanes, info || { bass: Array(16).fill(0), energy: -1 }, fill, crash, harmRng(h.seed ^ hashStr(tr.id + ":" + p.start)), h.weird); }
       });
     }
     out.forEach(p => { if (p._newLen != null) { p.len = p._newLen; delete p._newLen; } });
     tr.clips = out;
     if (JSON.stringify(tr.clips, strip_) !== before) names.push(tr.name);
+  }
+  return names;
+}
+
+/* Nachbar-Parts in derselben Spur: Der Clip davor und der Clip danach übernehmen einen Teil deiner Änderung
+   (Rhythmus und Linie, in ihre eigene Harmonie versetzt). Am stärksten im Takt direkt an der Grenze, leichter im Rest.
+   Ergebnis liegt in c.hm (Synth) bzw. c.hdm (Drums), berechnet immer aus deiner eigenen Fassung, so driftet nichts. */
+function splitBar(tr, c, last) {
+  const nb = Math.ceil(c.len / 4 - 1e-9); if (nb < 2) return [c, null];
+  const cut = c.start + 4 * (last ? nb - 1 : 1), p = JSON.parse(JSON.stringify(c, strip_)); p.id = uid();
+  p.start = cut; p.len = c.start + c.len - cut; c.len = cut - c.start;
+  tr.clips.push(p); return last ? [c, p] : [p, c]; // [Rest, Grenztakt] bzw. [Rest, Grenztakt]
+}
+function morphSynth(tr, nb, src, amt, rnd) {
+  if (!nb.ho) harmMark(nb);
+  const n = harmN(), N = 2 * n, role = harmRole(tr), b = nb.ho, s = nb.s, ss = src.s;
+  const own = harmRoots({ ...s, on: b.on, pitch: b.pitch, chd: b.chd }, nb.oct || 0), sr = harmRoots(ss, src.oct || 0);
+  const r = { on: b.on.slice(), pitch: b.pitch.slice(), chd: b.chd.slice(), vel: s.vel.slice(), len: s.len.slice() };
+  for (let i = 0; i < 16; i++) {
+    if (rnd() >= amt || (ss.on[i] === r.on[i] && (!ss.on[i] || ss.pitch[i] === r.pitch[i]))) continue;
+    r.on[i] = ss.on[i]; r.vel[i] = ss.vel[i]; r.len[i] = ss.len[i];
+    if (!ss.on[i]) continue;
+    if (role === "pad") { let k = i; while (k >= 0 && !b.on[k]) k--; if (k < 0) { k = i; while (k < 16 && !b.on[k]) k++; } if (k < 16 && b.on[k]) { r.pitch[i] = b.pitch[k]; r.chd[i] = b.chd[k]; } else { r.pitch[i] = ss.pitch[i]; r.chd[i] = ss.chd[i]; } continue; }
+    const w = i < 8 ? 0 : 1; let dl = own[w] != null && sr[w] != null ? own[w] - sr[w] : 0;
+    while (dl > n / 2) dl -= n; while (dl <= -n / 2) dl += n;
+    let d = Math.round(ss.pitch[i] * N) + dl + ((src.oct || 0) - (nb.oct || 0)) * n; while (d < 0) d += n; while (d > N) d -= n;
+    if (i % 4 === 0 && own[w] != null) { const set = chordPcs(own[w], styleChord(own[w], harmCfg().style)); for (let k = 0; k <= 3; k++) { if (d - k >= 0 && set.has(degPc(d - k))) { d -= k; break; } if (d + k <= N && set.has(degPc(d + k))) { d += k; break; } } }
+    r.pitch[i] = d / N; r.chd[i] = ss.chd ? ss.chd[i] || 0 : 0;
+  }
+  nb.hm = r; ["on", "pitch", "chd", "vel", "len"].forEach(f => s[f] = r[f].slice());
+}
+function morphDrum(nb, src, amt, rnd) {
+  if (!nb.hd) nb.hd = JSON.parse(JSON.stringify(nb.lanes));
+  const r = JSON.parse(JSON.stringify(nb.hd));
+  r.forEach((ln, k) => { if (k === 0 || k === 1) return; for (let i = 0; i < 16; i++) if (src.lanes[k][i] !== ln[i] && rnd() < amt) ln[i] = src.lanes[k][i]; }); // Kick und Snare bleiben
+  nb.hdm = r; nb.lanes = JSON.parse(JSON.stringify(r));
+}
+function neighborsFollow(tr, edited) {
+  const h = harmCfg(); if (h.neigh === false) return false;
+  const isDrum = tr.kind === "drum", ok = c => isDrum ? !!c.lanes : !!c.s;
+  const eds = tr.clips.filter(c => edited.has(c.id) && ok(c)); if (!eds.length) return false;
+  let did = false;
+  for (const e of eds) {
+    const others = tr.clips.filter(c => !edited.has(c.id) && ok(c) && c.start % 4 === e.start % 4);
+    const prev = others.filter(c => c.start + c.len <= e.start + 1e-6).sort((a, b) => b.start - a.start)[0];
+    const next = others.filter(c => c.start >= e.start + e.len - 1e-6).sort((a, b) => a.start - b.start)[0];
+    const amt = .2 + h.weird * .3, edge = .5 + h.weird * .3;
+    const go = (c, a, salt) => { const rnd = harmRng(h.seed ^ hashStr(c.id + salt + e.id)); if (isDrum) morphDrum(c, e, a, rnd); else morphSynth(tr, c, e, a, rnd); did = true; };
+    if (prev) { const [rest, b] = splitBar(tr, prev, true); go(b || rest, b ? edge : (edge + amt) / 2, "p"); if (b) go(rest, amt, "r"); }
+    if (next) { const [rest, b] = splitBar(tr, next, false); go(b || rest, b ? edge : (edge + amt) / 2, "n"); if (b) go(rest, amt, "r"); }
+  }
+  return did;
+}
+
+/* Synth-Spuren hören auf die Drums: Bass legt sich auf die Kick, Flächen setzen Stabs auf Snare, Clap und Rimshot,
+   die Melodie betont die Schläge. Aus deiner eigenen Fassung (c.ho) berechnet, Ergebnis in c.hm. */
+function cutClip(tr, c, beat) {
+  if (beat <= c.start + 1e-6 || beat >= c.start + c.len - 1e-6 || (beat - c.start) % 4) return null;
+  const p = JSON.parse(JSON.stringify(c, strip_)); p.id = uid(); p.start = beat; p.len = c.start + c.len - beat; c.len = beat - c.start;
+  tr.clips.push(p); return p;
+}
+function morphRhythm(tr, c, lanes, rnd, weird) {
+  if (!c.ho) harmMark(c);
+  const role = harmRole(tr), b = c.ho, s = c.s;
+  const r = { on: b.on.slice(), pitch: b.pitch.slice(), chd: b.chd.slice(), vel: (b.vel || s.vel).slice(), len: (b.len || s.len).slice() };
+  const prevOn = i => { for (let k = 1; k <= 16; k++) { const j = (i - k + 16) % 16; if (r.on[j]) return j; } return -1; };
+  const hit = (ln, i) => lanes[ln] && lanes[ln][i] > 0;
+  for (let i = 0; i < 16; i++) {
+    const kick = hit(0, i), back = hit(1, i) || hit(3, i) || hit(2, i);
+    if (role === "bass") {
+      if (kick && !r.on[i] && rnd() < .55 + weird * .3) { const j = prevOn(i); r.on[i] = 1; r.pitch[i] = j >= 0 ? r.pitch[j] : 0; r.vel[i] = .85; r.len[i] = .4; r.chd[i] = 0; }
+      else if (!kick && r.on[i] && i % 4 === 0 && lanes[0].some(v => v) && rnd() < .25) r.vel[i] *= .75;
+      if (hit(11, i) && !r.on[i] && rnd() < .2 + weird * .3) { const j = prevOn(i); if (j >= 0) { r.on[i] = 1; r.pitch[i] = Math.min(1, r.pitch[j] + harmN() / (2 * harmN())); r.vel[i] = .55; r.len[i] = .25; } }
+    } else if (role === "pad") {
+      if (back && !r.on[i] && i % 2 === 0 && rnd() < .3 + weird * .3) { const j = prevOn(i); if (j >= 0) { r.on[i] = 1; r.pitch[i] = r.pitch[j]; r.chd[i] = r.chd[j]; r.vel[i] = .6; r.len[i] = .3; } }
+    } else {
+      if ((kick || back) && r.on[i]) r.vel[i] = Math.min(1, r.vel[i] * 1.15);
+      if (hit(5, i) && !r.on[i] && rnd() < .15 + weird * .3) { const j = prevOn(i); if (j >= 0) { r.on[i] = 1; r.pitch[i] = r.pitch[j]; r.vel[i] = .6; r.len[i] = .3; } }
+    }
+  }
+  c.hm = r; ["on", "pitch", "chd", "vel", "len"].forEach(f => s[f] = r[f].slice());
+}
+function synthFollowDrums(dt, edited) {
+  const h = harmCfg(), names = [];
+  for (const dc of dt.clips.filter(c => edited.has(c.id) && c.lanes)) {
+    const b0 = dc.start, b1 = dc.start + dc.len;
+    for (const tr of P.tracks) {
+      if (tr.kind !== "synth" || h.lock[tr.id]) continue;
+      let hitAny = false;
+      for (const c of tr.clips.slice()) {
+        if (!c.s || c.start >= b1 || c.start + c.len <= b0) continue;
+        cutClip(tr, c, b1); const inner = cutClip(tr, c, b0) || c;
+        if (inner.start < b0 - 1e-6) continue; // nicht taktgenau: lieber unangetastet lassen
+        morphRhythm(tr, inner, dc.lanes, harmRng(h.seed ^ hashStr(inner.id + dc.id)), h.weird); hitAny = true;
+      }
+      if (hitAny) names.push(tr.name);
+    }
   }
   return names;
 }
@@ -1417,6 +1522,9 @@ function harmBox() {
   const r8 = row("ÜBERGÄNGE"); const sm = el("button", h.smooth !== false ? "on" : "", r8, h.smooth !== false ? "An" : "Aus");
   sm.onclick = () => { h.smooth = h.smooth === false; save(); harmBox(); };
   el("span", "tnote", r8, "Teile davor und danach leiten sanft in deine Änderung hinein und wieder hinaus.");
+  const r10 = row("NACHBAR-PARTS"); const nbb = el("button", h.neigh !== false ? "on" : "", r10, h.neigh !== false ? "An" : "Aus");
+  nbb.onclick = () => { h.neigh = h.neigh === false; save(); harmBox(); };
+  el("span", "tnote", r10, "Der Clip davor und danach in derselben Spur greifen deine Änderung auf: an der Grenze deutlich, sonst leicht.");
   const r9 = row("RHYTHMUS"); const dm = el("button", h.drums !== false ? "on" : "", r9, h.drums !== false ? "An" : "Aus");
   dm.onclick = () => { h.drums = h.drums === false; save(); harmBox(); };
   el("span", "tnote", r9, "Drums hören mit: Percussion spielt den Bass-Groove nach, HiHats folgen der Energie, vor neuen Parts kommt ein Fill, danach ein Crash.");
@@ -2011,7 +2119,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.2</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.3</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
