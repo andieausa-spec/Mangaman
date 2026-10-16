@@ -1,0 +1,52 @@
+name: TRENDY STUDIO macOS
+
+on:
+  push:
+    branches: [claude/project-thread-t7fo7q]
+    paths: ["trendy-studio/**", ".github/workflows/trendy-studio.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: trendy-studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Abhängigkeiten
+        run: npm install --no-audit --no-fund
+      - name: App bauen (Universal: Apple Silicon + Intel)
+        run: npx electron-builder --mac dir --universal --publish never
+      - name: Ad-hoc signieren und DMG erstellen
+        run: |
+          APP="$(ls -d dist/mac-universal/*.app)"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p dmg && cp -R "$APP" dmg/ && ln -s /Applications dmg/Programme
+          hdiutil create -volname "TRENDY STUDIO $VERSION" -srcfolder dmg -ov -format UDZO "TrendyStudio-$VERSION-macOS.dmg"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TrendyStudio-macOS
+          path: trendy-studio/*.dmg
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: trendy-studio-v${{ env.VERSION }}
+          name: TRENDY STUDIO ${{ env.VERSION }} (Testversion)
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          files: trendy-studio/*.dmg
+          body: |
+            **macOS 11 oder neuer** (Apple Silicon + Intel): `.dmg` öffnen und TRENDY STUDIO in den Ordner „Programme“ ziehen.
+
+            Die App ist nicht von Apple beglaubigt. Beim ersten Start: Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“.
