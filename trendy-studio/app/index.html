@@ -22,7 +22,7 @@ button:hover { background: var(--field); }
 button.on { background: var(--accent); }
 button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-visible, .clip:focus-visible, .num:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 select { background: var(--field); border: 1px solid var(--line); border-radius: 0; height: 22px; padding: 0 2px; }
-#app { height: 100%; display: grid; grid-template-rows: auto auto 1fr auto; min-width: 0; }
+#app { height: 100%; display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 
 /* Menüleiste */
 #menubar { display: flex; align-items: stretch; height: 24px; background: var(--field); border-bottom: 1px solid var(--line); padding: 0 6px; position: relative; z-index: 50; overflow-x: auto; overflow-y: visible; scrollbar-width: none; }
@@ -62,6 +62,31 @@ select { background: var(--field); border: 1px solid var(--line); border-radius:
 .harmthemes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 6px; }
 .harmthemes button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 6px 8px; height: auto; }
 .harmthemes small { font: 10px var(--mono); opacity: .75; }
+.oled { width: 128px; height: 40px; background: #020405; border: 2px solid #1c1c1a; border-radius: 3px; box-shadow: inset 0 0 0 1px #000; }
+@media (min-width: 900px) { .oled { width: 154px; height: 48px; } }
+#geq { position: absolute; inset: 0; overflow: auto; background: var(--bg); } #geqScroll { padding: 14px; } @media (max-width: 640px) { #geqScroll { padding: 8px; } }
+.hifi { min-width: 0; max-width: 980px; margin: 0 auto; background: repeating-linear-gradient(90deg, rgba(255,255,255,.18) 0 1px, rgba(0,0,0,.03) 1px 3px), linear-gradient(#e2e3e4, #b4b7ba); border: 1px solid #6d7074; border-radius: 4px; padding: 14px 18px 12px; color: #222; }
+.hifihead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.hifibrand { font: 700 16px/1.1 var(--sans, sans-serif); letter-spacing: .14em; } .hifibrand b { font-style: italic; letter-spacing: .04em; }
+.hifibrand small { display: block; font-size: 9px; font-weight: 600; letter-spacing: .22em; color: #4a4d50; margin-top: 3px; }
+.hifipow { display: flex; align-items: center; gap: 6px; background: #2b2d2f; color: #ddd; border-color: #111; font-size: 10px; letter-spacing: .12em; }
+.hifipow i { width: 8px; height: 8px; border-radius: 50%; background: #3a1410; } .hifipow.on i { background: #ff3b2f; box-shadow: 0 0 6px #ff3b2f; }
+.hifiwin { background: #07090a; border: 3px solid #26282a; border-radius: 3px; padding: 6px 6px 2px; }
+.hifiwin canvas { width: 100%; height: 150px; display: block; }
+.hifilab { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); text-align: center; font: 9px var(--mono); color: #4dff7a; opacity: .75; padding: 2px 0; }
+.hifisl { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 12px; }
+.hcol { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 150px auto; align-items: stretch; justify-items: center; }
+.hcol > b { grid-column: 1 / 3; font: 700 10px var(--mono); color: #333; margin-top: 4px; }
+.htrack { position: relative; width: 6px; background: #151617; border-radius: 3px; border: 1px solid #000; cursor: ns-resize; touch-action: none; margin: 6px 0; }
+.htrack:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.hcap { position: absolute; left: 50%; width: 26px; height: 14px; margin: -7px 0 0 -13px; background: linear-gradient(#fafafa, #c9cbcd 45%, #9a9da0 55%, #e4e5e6); border: 1px solid #555; border-radius: 2px; pointer-events: none; }
+.hcap::after { content: ""; position: absolute; left: 3px; right: 3px; top: 6px; height: 1px; background: #222; }
+.hscale { display: flex; flex-direction: column; justify-content: space-between; font: 8px var(--mono); color: #555; padding: 0 0 0 2px; }
+.hififoot { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,.25); }
+.hififoot button { background: #2b2d2f; color: #ddd; border-color: #111; font-size: 10px; letter-spacing: .08em; }
+.hififoot button.on { background: #ffb21c; color: #111; border-color: #a86f00; }
+.hififoot .hmode { margin-left: auto; }
+@media (max-width: 640px) { .hifi { padding: 10px 8px; } .hcol { grid-template-rows: 120px auto; } .hscale { display: none; } .hcap { width: 18px; margin-left: -9px; } .hifiwin canvas { height: 110px; } }
 #modal .acts { display: flex; justify-content: flex-end; gap: 6px; padding: 0 14px 12px; }
 
 /* Transport */
@@ -74,6 +99,7 @@ select { background: var(--field); border: 1px solid var(--line); border-radius:
 .num { min-width: 56px; height: 22px; padding: 2px 6px; background: var(--field); border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; text-align: right; cursor: ns-resize; touch-action: none; user-select: none; }
 .lcd { font-family: var(--mono); font-size: 13px; background: var(--ink); color: var(--accent); padding: 2px 8px; height: 22px; min-width: 96px; text-align: right; white-space: pre; }
 .spacer { flex: 1; }
+.views { flex-wrap: wrap; }
 .views button.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
 
 /* Arrangement */
@@ -264,21 +290,21 @@ input[type=range] { accent-color: var(--accent); }
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V1.4 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V1.5 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
       <button id="bLoop" title="Schleife an / aus">LOOP</button>
       <button id="bMetro" title="Metronom">KLICK</button>
     </div>
-    <div class="lcd" id="pos">  1.  1.  1</div>
+    <canvas id="oled" class="oled" aria-label="Display: zeigt, was gerade eingestellt wird"></canvas><div class="lcd" id="pos">  1.  1.  1</div>
     <div class="grp"><label>BPM</label><div class="num" id="nBpm" tabindex="0" role="spinbutton" aria-label="Tempo"></div>
       <label>SWING</label><div class="num" id="nSwing" tabindex="0" role="spinbutton" aria-label="Swing"></div></div>
     <div class="grp"><label>TONART</label><select id="sRoot" aria-label="Grundton"></select><select id="sScale" aria-label="Skala"></select><button id="bHarm" title="KI-Harmonie: die anderen Spuren passen sich an">KI-HARMONIE</button></div>
     <div class="grp"><label>RASTER</label><select id="sSnap" aria-label="Raster"><option value="0.25">1/16</option><option value="1">1/4</option><option value="4">Takt</option></select></div>
     <div class="spacer"></div>
     <div class="grp"><button id="bMidi" title="Web MIDI einschalten">MIDI</button></div>
-    <div class="grp views"><button id="vArr" class="on">ARRANGEMENT</button><button id="vMix">MISCHPULT</button><button id="vInst">INSTRUMENT</button><button id="vFx">EFFEKTE</button></div>
+    <div class="grp views"><button id="vArr" class="on">ARRANGEMENT</button><button id="vMix">MISCHPULT</button><button id="vInst">INSTRUMENT</button><button id="vFx">EFFEKTE</button><button id="vGeq">HIFI-EQ</button></div>
     <button id="bFull" title="Vollbild">VOLLBILD</button>
   </header>
   <main id="main">
@@ -293,6 +319,7 @@ input[type=range] { accent-color: var(--accent); }
     <section id="mix" hidden><div id="strips"></div></section>
     <section id="inst" hidden><div id="instScroll"></div></section>
     <section id="fx" hidden><div id="fxScroll"></div></section>
+    <section id="geq" hidden><div id="geqScroll"></div></section>
   </main>
   <section id="detail"><div id="device"></div><div id="editor"></div></section>
 </div>
@@ -394,7 +421,7 @@ function ensureAudio() {
   const ctx = A.ctx = new C();
   A.limiter = ctx.createDynamicsCompressor(); A.limiter.threshold.value = -3; A.limiter.ratio.value = 12; A.limiter.attack.value = .002; A.limiter.release.value = .1;
   A.limiter.connect(ctx.destination);
-  P.master._ch = makeChannel(P.master, A.limiter, false);
+  geqBuild(); P.master._ch = makeChannel(P.master, A.geqIn, false);
   A.retIn = [ctx.createGain(), ctx.createGain()];
   const conv = ctx.createConvolver(); conv.buffer = makeImpulse(2.8);
   P.ret[0]._ch = makeChannel(P.ret[0], P.master._ch.input, false);
@@ -441,7 +468,7 @@ function applyAll() {
   P.tracks.forEach(t => { applyChannel(t, true); if (t._inst) t._inst.apply(); });
   P.ret.forEach(r => applyChannel(r, false)); applyChannel(P.master, false);
   A.delay.delayTime.setTargetAtTime(spb() * .75, A.ctx.currentTime, .05);
-  fxRetempo();
+  fxRetempo(); applyGeq();
 }
 function buildTrackAudio(tr) {
   if (!A.ctx || tr._ch) return;
@@ -1604,6 +1631,196 @@ function harmBox() {
   rr.onclick = () => { const ks = HARM_THEMES.map((t, k) => t[0] === h.style ? k : -1).filter(k => k >= 0); h.seed = 1 + Math.floor(Math.random() * 1e6); applyTheme(ks[Math.floor(Math.random() * ks.length)]); };
 }
 
+
+/* ================= OLED-Display: zeigt animiert, woran gerade geschraubt wird ================= */
+const OLED = { W: 128, H: 40, kind: "idle", label: "", txt: "", v: 0, t: -1e9, cv: null, off: null };
+function oledKind(label) {
+  const L = (label || "").toUpperCase();
+  if (/^FADER|VOLUME|PEGEL|^MIX|SWING|SEND|LAUTST/.test(L)) return "level";
+  if (/PAN|STEREO|AUTOPAN/.test(L)) return "pan";
+  if (/^EQ |^\d+ ?(HZ|K)/.test(L)) return "eq";
+  if (/RESON/.test(L)) return "reso";
+  if (/HOCHPASS|LOW CUT/.test(L)) return "hp";
+  if (/^TIEF|^MITTE|^HOCH|^LO\b|^MID|^HI\b/.test(L)) return "shelf";
+  if (/CUTOFF|FILTER|VCF|DÄMPFUNG|^TON\b|FREQ/.test(L)) return "filter";
+  if (/ATTACK|ATTAK/.test(L)) return "envA";
+  if (/DECAY|HÜLLK|ENV|LÄNGE|ERHOLUNG/.test(L)) return "envD";
+  if (/RELEASE|AUSKLANG/.test(L)) return "envR";
+  if (/SUSTAIN/.test(L)) return "envS";
+  if (/WELLE|FORM|SÄGE|DREIECK|RECHTECK|^SUB|PULS|WAVE/.test(L)) return "wave";
+  if (/LFO|TIEFE|TEMPO|RATE|WOBBLE|LEIERN|SPEED|GLEITEN/.test(L)) return "lfo";
+  if (/DRIVE|SÄTTIG|TAPE|KNISTERN/.test(L)) return "drive";
+  if (/BITS|STUFEN/.test(L)) return "bits";
+  if (/ZEIT|FEEDBACK|PRE-DELAY|VERSATZ|TIMING|ECHO/.test(L)) return "echo";
+  if (/HALL|GRÖSSE|RAUM/.test(L)) return "verb";
+  if (/SCHWELLE|RATIO|AUFHOLEN|PUMP|GATE/.test(L)) return "comp";
+  if (/TONHÖHE|TUNE|STIMM/.test(L)) return "pitch";
+  return "generic";
+}
+function oledTouch(label, v, txt) {
+  OLED.label = (label || "").toUpperCase().slice(0, 14); OLED.v = clamp(+v || 0, 0, 1); OLED.txt = txt || ""; OLED.kind = oledKind(label); OLED.t = performance.now();
+}
+function oledInit() {
+  const cv = OLED.cv = $("oled"); if (!cv) return;
+  cv.width = OLED.W; cv.height = OLED.H;
+  OLED.g = cv.getContext("2d"); OLED.g.imageSmoothingEnabled = false;
+}
+function oledDraw(now) {
+  const g = OLED.g; if (!g) return;
+  const W = OLED.W, H = OLED.H, v = OLED.v, ph = now / 1000;
+  const C = "#8ff4ff", D = "rgba(143,244,255,.28)";
+  g.fillStyle = "#020405"; g.fillRect(0, 0, W, H);
+  g.strokeStyle = C; g.fillStyle = C; g.lineWidth = 1;
+  const idle = now - OLED.t > 2600;
+  const text = (s, x, y, al) => { g.font = "7px monospace"; g.textAlign = al || "left"; g.textBaseline = "top"; g.fillText(s, x, y); };
+  const path = (f, x0, x1, yTop, yBot) => { g.beginPath(); for (let x = x0; x <= x1; x++) { const y = yTop + (1 - clamp(f((x - x0) / (x1 - x0)), 0, 1)) * (yBot - yTop); x === x0 ? g.moveTo(x + .5, y + .5) : g.lineTo(x + .5, y + .5); } g.stroke(); };
+  const top = 10, bot = H - 2;
+  if (idle) {
+    // Ruhe: Oszilloskop des Masters, sonst Tempo und Tonart
+    if (A.ctx && T.playing) {
+      if (!A.oledAn) { A.oledAn = A.ctx.createAnalyser(); A.oledAn.fftSize = 512; A.limiter.connect(A.oledAn); A.oledBuf = new Float32Array(512); }
+      A.oledAn.getFloatTimeDomainData(A.oledBuf);
+      let st = 0; for (let i = 1; i < 256; i++) if (A.oledBuf[i - 1] < 0 && A.oledBuf[i] >= 0) { st = i; break; }
+      text("MASTER", 1, 1); text(P.bpm.toFixed(0) + " BPM", W - 1, 1, "right");
+      g.beginPath(); for (let x = 0; x < W; x++) { const s = A.oledBuf[st + x * 2] || 0, y = (top + bot) / 2 - s * (bot - top) * .9; x ? g.lineTo(x + .5, y) : g.moveTo(.5, y); } g.stroke();
+    } else {
+      text("TRENDY STUDIO", W / 2, 6, "center");
+      text(KEYS[P.root] + " " + SCALES[P.scale][0].toUpperCase().slice(0, 9) + " · " + P.bpm.toFixed(0) + " BPM", W / 2, 18, "center");
+      const x = (ph * 30) % (W + 20) - 10; g.fillStyle = D; g.fillRect(x, 30, 10, 2); g.fillStyle = C; g.fillRect(x + 4, 30, 2, 2);
+    }
+    return;
+  }
+  text(OLED.label, 1, 1); text(OLED.txt.slice(0, 10), W - 1, 1, "right");
+  const k = OLED.kind;
+  const lp = (f, fc, q) => { const r = f / fc; return 1 / Math.sqrt((1 - r * r) ** 2 + (r / q) ** 2); };
+  const logx = x => Math.pow(10, x * 3); // 1 .. 1000
+  if (k === "filter" || k === "reso" || k === "hp") {
+    const fc = Math.pow(10, .3 + (k === "reso" ? .55 : v) * 2.4), q = k === "reso" ? .5 + v * 7 : 1.4;
+    const f = x => { const a = k === "hp" ? lp(fc * fc / Math.max(1e-3, logx(x)), fc, q) : lp(logx(x), fc, q); return .12 + Math.log10(Math.max(1e-3, a)) / 2.2 + .55; };
+    g.strokeStyle = D; for (let i = 0; i < 4; i++) { const x = 4 + i * 40; g.beginPath(); g.moveTo(x + .5, top); g.lineTo(x + .5, bot); g.stroke(); }
+    g.strokeStyle = C; path(f, 2, W - 3, top, bot);
+    const sx = 2 + ((ph * .25) % 1) * (W - 5); g.fillRect(sx, top + (1 - clamp(f((sx - 2) / (W - 5)), 0, 1)) * (bot - top) - 1, 2, 2);
+  } else if (k === "shelf" || k === "eq") {
+    const gains = k === "eq" && P.geq ? P.geq.g : null;
+    const f = x => {
+      if (gains) { let s = 0; gains.forEach((gd, i) => { const d = (x * 10 - (i + .5)); s += gd * Math.exp(-d * d * 1.6); }); return .5 + s / 30; }
+      const db = (v - .5) * 24, w = OLED.label.startsWith("TIEF") ? 1 / (1 + Math.exp((x - .25) * 18)) : OLED.label.startsWith("HOCH") ? 1 / (1 + Math.exp(-(x - .75) * 18)) : Math.exp(-(((x - .5) * 6) ** 2));
+      return .5 + db * w / 30;
+    };
+    g.strokeStyle = D; g.beginPath(); g.moveTo(0, (top + bot) / 2 + .5); g.lineTo(W, (top + bot) / 2 + .5); g.stroke();
+    g.strokeStyle = C; path(f, 2, W - 3, top, bot);
+    if (A.ctx && T.playing && A.spec) { const d = A.specBuf; A.spec.getByteFrequencyData(d); g.fillStyle = D; for (let x = 0; x < W; x += 3) { const bin = Math.floor(Math.pow(10, x / W * 3) * 2); const m = (d[bin] || 0) / 255; g.fillRect(x, bot - m * (bot - top), 2, m * (bot - top)); } }
+  } else if (k.startsWith("env")) {
+    const a = k === "envA" ? v : .15, dcy = k === "envD" ? v : .3, s = k === "envS" ? v : .55, r = k === "envR" ? v : .35;
+    const tot = a + dcy + .35 + r, X = t => 2 + t / tot * (W - 5);
+    const pts = [[0, 0], [a, 1], [a + dcy, s], [a + dcy + .35, s], [tot, 0]];
+    g.beginPath(); pts.forEach(([t, y], i) => { const px = X(t) + .5, py = bot - y * (bot - top) + .5; i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke();
+    const seg = { envA: 0, envD: 1, envS: 2, envR: 3 }[k]; g.fillStyle = D;
+    g.fillRect(X(pts[seg][0]), top, Math.max(1, X(pts[seg + 1][0]) - X(pts[seg][0])), bot - top);
+    const tt = (ph * .6 % 1) * tot; let y = 0; for (let i = 0; i < 4; i++) if (tt >= pts[i][0] && tt <= pts[i + 1][0]) { const u = (tt - pts[i][0]) / Math.max(1e-6, pts[i + 1][0] - pts[i][0]); y = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u; }
+    g.fillStyle = C; g.fillRect(X(tt) - 1, bot - y * (bot - top) - 1, 3, 3);
+  } else if (k === "wave") {
+    const f = x => { const p = (x * 3 + ph * .5) % 1, saw = p, sq = p < .5 ? 1 : 0, tri = 1 - Math.abs(p * 2 - 1), sin = .5 + .5 * Math.sin(p * Math.PI * 2); const T_ = OLED.txt.toUpperCase(), m = /SÄGE|SAW/.test(T_) ? 0 : /RECHT|PULS|SQU/.test(T_) ? 1 : /DREI|TRI/.test(T_) ? 2 : /SIN/.test(T_) ? 3 : v * 3; return m < 1 ? saw * (1 - m) + sq * m : m < 2 ? sq * (2 - m) + tri * (m - 1) : tri * (3 - m) + sin * (m - 2); };
+    path(x => .1 + f(x) * .8, 2, W - 3, top, bot);
+  } else if (k === "lfo" || k === "pitch") {
+    const fr = k === "pitch" ? 2 + v * 6 : 1 + v * 7;
+    path(x => .5 + .42 * Math.sin((x * fr - ph * (k === "pitch" ? 1 : 1.5 + v * 4)) * Math.PI * 2), 2, W - 3, top, bot);
+  } else if (k === "drive") {
+    const kk = 1 + v * 12, f = x => .5 + Math.tanh((x * 2 - 1) * kk) / Math.tanh(kk) * .45;
+    g.strokeStyle = D; path(x => x * .9 + .05, 2, 40, top, bot); g.strokeStyle = C; path(f, 2, 40, top, bot);
+    path(x => .5 + Math.tanh(Math.sin((x * 3 - ph) * Math.PI * 2) * kk) / Math.tanh(kk) * .42, 46, W - 3, top, bot);
+  } else if (k === "bits") {
+    const st = Math.max(2, Math.round(2 + (1 - v) * 14));
+    path(x => .5 + Math.round(Math.sin((x * 2 - ph * .5) * Math.PI * 2) * st) / st * .42, 2, W - 3, top, bot);
+  } else if (k === "echo") {
+    const gap = 8 + v * 26, fb = OLED.label.includes("FEEDBACK") ? .3 + v * .65 : .6, off = (ph * 40) % gap;
+    for (let i = 0, a = 1; i < 12 && a > .05; i++, a *= fb) { const x = 3 + i * gap + (i ? off * .0 : 0); if (x > W - 3) break; const h = a * (bot - top); g.fillRect(x, bot - h, 2, h); }
+    g.fillStyle = D; g.fillRect(3 + ((ph * 50) % (W - 6)), top, 1, bot - top);
+  } else if (k === "verb") {
+    const len = .2 + v * .8;
+    for (let x = 2; x < W - 2; x++) { const u = (x - 2) / (W - 4), env = Math.exp(-u / len * 3) * (u < .03 ? u / .03 : 1); const h = env * (bot - top) * (.4 + .6 * Math.abs(Math.sin(x * 12.9898 + Math.floor(ph * 12) * 78.233))); g.fillRect(x, (top + bot) / 2 - h / 2, 1, Math.max(1, h)); }
+  } else if (k === "comp") {
+    const th = .2 + v * .7, ra = OLED.label.includes("RATIO") ? 1 + v * 9 : 4;
+    path(x => x < th ? x : th + (x - th) / ra, 2, 50, top, bot);
+    const lvl = .5 + .5 * Math.sin(ph * 4); const red = lvl > th ? (lvl - th) * (1 - 1 / ra) : 0;
+    g.fillStyle = D; g.fillRect(60, bot - lvl * (bot - top), 20, lvl * (bot - top)); g.fillStyle = C; g.fillRect(90, top, 20, red * (bot - top)); text("GR", 100, bot - 8, "center");
+  } else if (k === "pan") {
+    g.strokeStyle = D; g.strokeRect(4.5, 20.5, W - 9, 10); const x = 6 + v * (W - 14); g.fillRect(x - 2, 22, 5, 7); text("L", 6, 12); text("R", W - 6, 12, "right");
+  } else {
+    // Pegel und alles andere: großer Balken mit Segmenten
+    const n = 24, on = Math.round(v * n); for (let i = 0; i < n; i++) { g.fillStyle = i < on ? C : D; g.fillRect(3 + i * 5.1, 18, 4, 16); }
+  }
+}
+
+/* ================= TRENDY GE-10: Grafik-Equalizer mit Leuchtbalken-Spektrum im Stil der 80er-Hifi-Türme ================= */
+const GEQ_F = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const GEQ_LABEL = ["31", "63", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"];
+const GEQ_PRESETS = [
+  ["FLAT", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], ["LOUDNESS", [7, 5, 2, 0, -1, -1, 0, 2, 4, 6]], ["DUB BASS", [8, 7, 3, -1, -3, -2, -1, 0, -2, -4]],
+  ["HOUSE", [5, 4, 1, -1, -2, -1, 1, 3, 4, 3]], ["ELECTRO", [6, 3, -2, -3, 0, 2, 4, 5, 3, 2]], ["DISCO", [4, 5, 2, 0, -2, -2, 0, 2, 5, 6]],
+  ["RADIO", [-12, -10, -6, 2, 5, 6, 5, 1, -6, -12]], ["NACHT", [3, 2, 0, -1, -2, -3, -3, -4, -6, -8]],
+];
+const geqCfg = () => { if (!P.geq) P.geq = { on: true, g: Array(10).fill(0), pre: 0, mode: 0 }; return P.geq; };
+function geqBuild() {
+  const ctx = A.ctx; A.geqIn = ctx.createGain();
+  A.geq = GEQ_F.map((f, i) => { const b = ctx.createBiquadFilter(); b.type = i === 0 ? "lowshelf" : i === 9 ? "highshelf" : "peaking"; b.frequency.value = f; b.Q.value = 1.41; b.gain.value = 0; return b; });
+  A.geqIn.connect(A.geq[0]); for (let i = 1; i < 10; i++) A.geq[i - 1].connect(A.geq[i]); A.geq[9].connect(A.limiter);
+  A.spec = ctx.createAnalyser(); A.spec.fftSize = 4096; A.spec.smoothingTimeConstant = .55; A.limiter.connect(A.spec); A.specBuf = new Uint8Array(A.spec.frequencyBinCount);
+}
+function applyGeq() { if (!A.geq) return; const q = geqCfg(), t = A.ctx.currentTime; A.geq.forEach((f, i) => f.gain.setTargetAtTime(q.on ? q.g[i] : 0, t, .03)); }
+const GEQ = { seg: 16, peak: Array(10).fill(0), lvl: Array(10).fill(0), pt: Array(10).fill(0) };
+function renderGeq() {
+  const box = $("geqScroll"); box.innerHTML = ""; const q = geqCfg();
+  const dev = el("div", "hifi", box);
+  const head = el("div", "hifihead", dev);
+  el("div", "hifibrand", head, "TRENDY <b>GE-10</b><small>STEREO GRAPHIC EQUALIZER · SPECTRUM ANALYZER</small>");
+  const pw = el("button", "hifipow" + (q.on ? " on" : ""), head, "<i></i>EQ ON"); pw.setAttribute("aria-pressed", q.on);
+  pw.onclick = () => { q.on = !q.on; applyGeq(); save(); renderGeq(); };
+  const win = el("div", "hifiwin", dev); const cv = el("canvas", "", win); cv.id = "geqSpec"; cv.setAttribute("aria-label", "Spektrum");
+  const lab = el("div", "hifilab", win); GEQ_LABEL.forEach(t => el("span", "", lab, t));
+  const sl = el("div", "hifisl", dev);
+  GEQ_F.forEach((f, i) => {
+    const col = el("div", "hcol", sl), tr = el("div", "htrack", col), cap = el("div", "hcap", tr);
+    tr.tabIndex = 0; tr.setAttribute("role", "slider"); tr.setAttribute("aria-label", GEQ_LABEL[i] + " Hz");
+    const scale = el("div", "hscale", col); ["+12", "0", "−12"].forEach(t => el("span", "", scale, t));
+    el("b", "", col, GEQ_LABEL[i]);
+    const show = () => { cap.style.top = (1 - (q.g[i] + 12) / 24) * 100 + "%"; tr.setAttribute("aria-valuetext", (q.g[i] > 0 ? "+" : "") + q.g[i].toFixed(1) + " dB"); };
+    const set = v => { q.g[i] = Math.round(clamp(v, -12, 12) * 2) / 2; if (Math.abs(q.g[i]) < .6) q.g[i] = 0; show(); applyGeq(); oledTouch("EQ " + GEQ_LABEL[i] + " HZ", (q.g[i] + 12) / 24, (q.g[i] > 0 ? "+" : "") + q.g[i].toFixed(1) + "DB"); save(); };
+    let sy = 0, sv = 0;
+    tr.addEventListener("pointerdown", e => { tr.setPointerCapture(e.pointerId); const r = tr.getBoundingClientRect(); if (e.target === tr) set(12 - (e.clientY - r.top) / r.height * 24); sy = e.clientY; sv = q.g[i]; e.preventDefault(); });
+    tr.addEventListener("pointermove", e => { if (tr.hasPointerCapture(e.pointerId)) set(sv - (e.clientY - sy) / tr.clientHeight * 24); });
+    tr.addEventListener("dblclick", () => set(0));
+    tr.addEventListener("keydown", e => { if (e.key === "ArrowUp") { set(q.g[i] + .5); e.preventDefault(); } if (e.key === "ArrowDown") { set(q.g[i] - .5); e.preventDefault(); } });
+    show();
+  });
+  const foot = el("div", "hififoot", dev);
+  GEQ_PRESETS.forEach(([n, g], k) => { const b = el("button", q.pre === k ? "on" : "", foot, n); b.onclick = () => { q.g = g.slice(); q.pre = k; applyGeq(); oledTouch("EQ " + n, .5, ""); OLED.kind = "eq"; save(); renderGeq(); }; });
+  const md = el("button", "hmode", foot, ["BALKEN", "PEAK", "PUNKTE"][q.mode || 0]); md.title = "Anzeige des Spektrums";
+  md.onclick = () => { q.mode = ((q.mode || 0) + 1) % 3; save(); md.textContent = ["BALKEN", "PEAK", "PUNKTE"][q.mode]; };
+  el("p", "tnote", box, "Der GE-10 sitzt fest in der Summe vor dem Limiter. Regler ziehen oder klicken, Doppelklick stellt auf 0 dB. Das Spektrum zeigt, was gerade aus den Boxen kommt.");
+}
+function drawGeq() {
+  const cv = $("geqSpec"); if (!cv || $("geq").hidden) return;
+  const w = cv.clientWidth, h = cv.clientHeight; if (!w) return;
+  if (cv.width !== Math.round(w * DPR()) || cv.height !== Math.round(h * DPR())) { setupCanvas(cv, w, h); cv.style.width = "100%"; cv.style.height = ""; }
+  const g = cv.getContext("2d"), q = geqCfg(), n = 10, S = GEQ.seg, now = performance.now();
+  g.fillStyle = "#07090a"; g.fillRect(0, 0, w, h);
+  let d = null; if (A.ctx && A.spec) { d = A.specBuf; A.spec.getByteFrequencyData(d); }
+  const bw = w / n, sh = (h - 6) / S;
+  for (let i = 0; i < n; i++) {
+    let m = 0;
+    if (d && T.playing) { const sr = A.ctx.sampleRate, lo = GEQ_F[i] / 1.41, hi = GEQ_F[i] * 1.41; const b0 = Math.max(1, Math.floor(lo / sr * A.spec.fftSize)), b1 = Math.min(d.length - 1, Math.ceil(hi / sr * A.spec.fftSize)); for (let b = b0; b <= b1; b++) m = Math.max(m, d[b]); m = clamp((m - 70) / 175, 0, 1); }
+    GEQ.lvl[i] = Math.max(m, GEQ.lvl[i] * .86);
+    if (GEQ.lvl[i] >= GEQ.peak[i]) { GEQ.peak[i] = GEQ.lvl[i]; GEQ.pt[i] = now; } else if (now - GEQ.pt[i] > 700) GEQ.peak[i] = Math.max(0, GEQ.peak[i] - .012);
+    const on = Math.round(GEQ.lvl[i] * S), pk = Math.min(S - 1, Math.round(GEQ.peak[i] * S));
+    for (let s = 0; s < S; s++) {
+      const col = s >= S - 2 ? "#ff3b2f" : s >= S - 5 ? "#ffb21c" : "#4dff7a", lit = q.mode === 2 ? s === on - 1 : q.mode === 1 ? s < on && s >= on - 2 : s < on;
+      g.fillStyle = lit || (s === pk && pk > 0) ? col : "rgba(77,255,122,.07)";
+      g.fillRect(i * bw + 3, h - 3 - (s + 1) * sh + 1, bw - 6, sh - 2);
+    }
+  }
+}
+
 /* ================= MIDI ================= */
 const MIDI = { access: null, outs: [] };
 async function enableMidi() {
@@ -1771,7 +1988,7 @@ function knob(parent, o) {
     g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * (r - 5), cy + Math.sin(a) * (r - 5)); g.stroke();
   };
   const k = { box, cv, refresh() { draw(); const t = o.fmt ? o.fmt() : ""; out.textContent = t; cv.setAttribute("aria-valuetext", t); } };
-  const change = v => { o.set(clamp(v, 0, 1)); k.refresh(); };
+  const change = v => { o.set(clamp(v, 0, 1)); k.refresh(); oledTouch(o.label || o.aria, o.get(), o.fmt ? o.fmt() : ""); };
   const step = () => o.steps ? 1 / o.steps() : .02;
   let sy = 0, sv = 0;
   cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); sy = e.clientY; sv = o.get(); e.preventDefault(); });
@@ -2185,7 +2402,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.4</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.5</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
@@ -3195,7 +3412,7 @@ function strip(box, st, type) {
     db.textContent = dbText(st.vol) + " dB";
   };
   let sy = 0, sv = 0;
-  const set = v => { st.vol = clamp(v, 0, 1); if (Math.abs(st.vol - .8) < .006) st.vol = .8; if (A.ctx) applyChannel(st, isTrack); F.draw(); save(); };
+  const set = v => { st.vol = clamp(v, 0, 1); if (Math.abs(st.vol - .8) < .006) st.vol = .8; if (A.ctx) applyChannel(st, isTrack); F.draw(); oledTouch("FADER " + st.name, st.vol, dbText(st.vol) + "DB"); save(); };
   fc.addEventListener("pointerdown", e => { fc.setPointerCapture(e.pointerId); sy = e.clientY; sv = st.vol; e.preventDefault(); });
   fc.addEventListener("pointermove", e => { if (fc.hasPointerCapture(e.pointerId)) set(sv - (e.clientY - sy) / Math.max(40, F.h - 20) * (e.shiftKey ? .2 : 1)); });
   fc.addEventListener("dblclick", () => set(.8));
@@ -3256,12 +3473,13 @@ function frame() {
     drawPlayhead();
   }
   if (A.ctx) { drawMeters(); drawHeadMeters(); }
+  const nowMs = performance.now(); oledDraw(nowMs); drawGeq();
   requestAnimationFrame(frame);
 }
 function setView(v) {
-  $("arr").hidden = v !== "arr"; $("mix").hidden = v !== "mix"; $("inst").hidden = v !== "inst"; $("fx").hidden = v !== "fx"; $("detail").hidden = v !== "arr" || !!P.hideDetail;
-  [["vArr", "arr"], ["vMix", "mix"], ["vInst", "inst"], ["vFx", "fx"]].forEach(([id, k]) => { $(id).classList.toggle("on", v === k); $(id).setAttribute("aria-pressed", v === k); });
-  if (v === "mix") { renderMixer(); requestAnimationFrame(layoutMeters); } else if (v === "inst") renderInst(); else if (v === "fx") renderFx(); else renderArr();
+  $("arr").hidden = v !== "arr"; $("mix").hidden = v !== "mix"; $("inst").hidden = v !== "inst"; $("fx").hidden = v !== "fx"; $("geq").hidden = v !== "geq"; $("detail").hidden = v !== "arr" || !!P.hideDetail;
+  [["vArr", "arr"], ["vMix", "mix"], ["vInst", "inst"], ["vFx", "fx"], ["vGeq", "geq"]].forEach(([id, k]) => { $(id).classList.toggle("on", v === k); $(id).setAttribute("aria-pressed", v === k); });
+  if (v === "mix") { renderMixer(); requestAnimationFrame(layoutMeters); } else if (v === "inst") renderInst(); else if (v === "fx") renderFx(); else if (v === "geq") renderGeq(); else renderArr();
   try { localStorage.setItem("trendy-studio-view", v); } catch (e) {}
 }
 
@@ -3290,7 +3508,7 @@ load();
   $("bLoop").onclick = () => { P.loop.on = !P.loop.on; $("bLoop").classList.toggle("on", P.loop.on); save(); renderArr(); };
   $("bMetro").onclick = () => { P.metro = !P.metro; $("bMetro").classList.toggle("on", P.metro); save(); };
   $("bMidi").onclick = enableMidi; $("bHarm").onclick = harmBox; $("bHarm").classList.toggle("on", harmCfg().on);
-  $("vArr").onclick = () => setView("arr"); $("vMix").onclick = () => setView("mix"); $("vInst").onclick = () => setView("inst"); $("vFx").onclick = () => setView("fx");
+  $("vArr").onclick = () => setView("arr"); $("vMix").onclick = () => setView("mix"); $("vInst").onclick = () => setView("inst"); $("vFx").onclick = () => setView("fx"); $("vGeq").onclick = () => setView("geq"); oledInit();
   $("bFull").onclick = () => { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (d.requestFullscreen) d.requestFullscreen().catch(() => toast("Vollbild ist hier nicht erlaubt.")); else toast("Vollbild ist hier nicht erlaubt."); };
   $("addSynth").onclick = () => addTrack("synth"); $("addPlanet").onclick = () => addTrack("planet"); $("addDrum").onclick = () => addTrack("drum"); $("addDrummer").onclick = () => addTrack("drummer"); $("addAudio").onclick = () => addTrack("audio");
   $("zIn").onclick = () => { P.ppb = Math.min(80, Math.round(P.ppb * 1.4)); save(); renderArr(); };
