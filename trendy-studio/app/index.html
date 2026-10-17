@@ -290,7 +290,7 @@ input[type=range] { accent-color: var(--accent); }
 <div id="app">
   <nav id="menubar" aria-label="Menü"></nav>
   <header id="top">
-    <div class="logo">TRENDY STUDIO<small>V1.5 · Andreas Engel, Darmstadt</small></div>
+    <div class="logo">TRENDY STUDIO<small>V1.6 · Andreas Engel, Darmstadt</small></div>
     <div class="grp">
       <button class="tbtn" id="bPlay" title="Start (Leertaste)" aria-label="Start">▶</button>
       <button class="tbtn" id="bStop" title="Stopp, zweimal: an den Anfang" aria-label="Stopp">■</button>
@@ -395,6 +395,7 @@ function commit() {
   clearTimeout(saveT); saveT = 0;
   const skip = HARM.skip; HARM.skip = false;
   const ch = skip ? null : harmPrep(hist.last);
+  if (!ch && !skip) HARM.gen = null;
   const s = JSON.stringify(P, strip_);
   if (s === hist.last) return;
   if (hist.last !== null) { hist.past.push(hist.last); if (hist.past.length > 150) hist.past.shift(); hist.future = []; }
@@ -1284,7 +1285,11 @@ function harmRun(changed) {
   }
   if (h.lead !== "auto") { L = findTrack(h.lead); if (!L || !changed.includes(L)) return; }
   else L = changed.find(t => t.id === sel.track) || changed[0];
+  // Zufall oder Preset: erst die neue Sequenz ins Gesamtbild einpassen, dann ziehen die anderen leicht nach
+  const gen = HARM.gen; HARM.gen = null; HARM.soft = false;
+  if (gen && HARM.edited.has(gen)) { const c = L.clips.find(x => x.id === gen); if (c && c.s && harmConform(L, c)) HARM.soft = true; }
   harmonizeFrom(L, false, HARM.edited);
+  HARM.soft = false;
 }
 function harmonizeFrom(L, loud, edited) {
   const h = harmCfg(), moved = edited && edited.size ? neighborsFollow(L, edited) : false, map = leaderMap(L);
@@ -1299,6 +1304,7 @@ function harmonizeFrom(L, loud, edited) {
     [...bars].forEach(b => { if (b > 0 && !bars.has(b - 1)) { fills.add(b - 1); crashes.add(b); } });
     drumFollow(bars, fills, crashes).forEach(n => { if (!names.includes(n)) names.push(n); });
   }
+  for (let i = names.length - 1; i >= 0; i--) if (names[i] === L.name) names.splice(i, 1); // eigene Nachbar-Parts stehen schon als „Parts davor und danach“ drin
   // KI-Ideen im Bereich der Änderung
   const ib = new Set(); L.clips.filter(c => c.s && (!edited || !edited.size || edited.has(c.id))).forEach(c => { for (let b = Math.floor(c.start / 4); b < Math.ceil((c.start + c.len) / 4); b++) ib.add(b); });
   const ideas = map.size && !HARM.jamNote ? harmIdeas(ideaPool(ib, new Set([...(edited || []), ...L.clips.map(c => c.id)])), harmRng(h.seed ^ hashStr("idea" + JSON.stringify([...ib]) + (h.n = (h.n || 0) + 1)))) : [];
@@ -1308,13 +1314,13 @@ function harmonizeFrom(L, loud, edited) {
   else if (loud) toast(map.size ? "Alles passt schon zu „" + L.name + "“." : "„" + L.name + "“ hat keine Noten, an die sich etwas anpassen könnte.");
 }
 // Grundton eines halben Takts: Leitfaden, sonst das, was gerade klingt (Bass zuerst, dann Fläche, dann Melodie)
-function harmRootAt(hb, map) {
+function harmRootAt(hb, map, skip) {
   const h = harmCfg();
   if (map && map.has(hb * 8)) return map.get(hb * 8);
   if (h.plan && h.plan[Math.floor(hb / 2)] != null) return h.plan[Math.floor(hb / 2)];
   for (const role of ["bass", "pad", "lead"]) for (const t of P.tracks) {
     if (t.kind !== "synth" || harmRole(t) !== role) continue;
-    const c = t.clips.find(c => c.s && hb * 2 >= c.start && hb * 2 < c.start + c.len); if (!c) continue;
+    const c = t.clips.find(c => c.s && c.id !== skip && hb * 2 >= c.start && hb * 2 < c.start + c.len); if (!c) continue;
     const r = harmRoots(c.s, c.oct || 0)[((hb * 8 - Math.round(c.start * 4)) % 16 + 16) % 16 < 8 ? 0 : 1]; if (r != null) return r;
   }
   return null;
@@ -1459,7 +1465,7 @@ function neighborsFollow(tr, edited) {
     const others = tr.clips.filter(c => !edited.has(c.id) && ok(c) && c.start % 4 === e.start % 4);
     const prev = others.filter(c => c.start + c.len <= e.start + 1e-6).sort((a, b) => b.start - a.start)[0];
     const next = others.filter(c => c.start >= e.start + e.len - 1e-6).sort((a, b) => a.start - b.start)[0];
-    const amt = .2 + h.weird * .3, edge = .5 + h.weird * .3;
+    const soft = HARM.soft ? .6 : 1, amt = (.2 + h.weird * .3) * soft, edge = (.5 + h.weird * .3) * soft;
     const go = (c, a, salt) => { const rnd = harmRng(h.seed ^ hashStr(c.id + salt + e.id)); if (isDrum) morphDrum(c, e, a, rnd); else morphSynth(tr, c, e, a, rnd); did = true; };
     if (prev) { const [rest, b] = splitBar(tr, prev, true); go(b || rest, b ? edge : (edge + amt) / 2, "p"); if (b) go(rest, amt, "r"); }
     if (next) { const [rest, b] = splitBar(tr, next, false); go(b || rest, b ? edge : (edge + amt) / 2, "n"); if (b) go(rest, amt, "r"); }
@@ -1569,6 +1575,26 @@ function harmJam(beat) {
   HARM.jamNote = null;
 }
 
+/* Zufall oder Preset: Die neue Sequenz richtet sich am Gesamtbild aus (was die anderen Spuren an dieser Stelle spielen,
+   sonst die Nachbar-Parts derselben Spur). Je nach Weirdness behält sie hier und da ihren eigenen Grundton, so ändert sich die Stimmung leicht. */
+function harmConform(L, c) {
+  const h = harmCfg(), n = harmN(), b0 = Math.round(c.start / 2), nh = Math.max(2, Math.round(c.len / 2)), votes = [{}, {}];
+  for (let k = 0; k < nh; k++) { const r = harmRootAt(b0 + k, null, c.id); if (r != null) votes[k % 2][r] = (votes[k % 2][r] || 0) + 1; }
+  const pick = v => { const e = Object.entries(v).sort((a, b) => b[1] - a[1])[0]; return e ? +e[0] : null; };
+  let ctx = [pick(votes[0]), pick(votes[1])];
+  if (ctx[0] == null && ctx[1] == null) {
+    const nb = L.clips.filter(x => x.s && x !== c).sort((a, b) => Math.abs(a.start - c.start) - Math.abs(b.start - c.start))[0];
+    ctx = nb ? harmRoots(nb.s, nb.oct || 0) : [0, 0];
+  }
+  if (ctx[0] == null) ctx[0] = ctx[1]; if (ctx[1] == null) ctx[1] = ctx[0];
+  if (ctx[0] == null) return false;
+  const rnd = harmRng(h.seed ^ hashStr("conf" + c.id + (h.n || 0))), keep = .15 + h.weird * .35;
+  const T = Array.from({ length: 16 }, (_, i) => ctx[i < 8 ? 0 : 1]);
+  // Stimmung leicht verschieben: eine Hälfte darf ihren eigenen Grundton behalten
+  if (rnd() < keep) for (let i = rnd() < .5 ? 0 : 8, e = i + 8; i < e; i++) T[i] = null;
+  harmMark(c); adaptClip(c, T, harmRole(L), h.style, rnd, h.weird * .5, false);
+  return true;
+}
 function harmBars() {
   if (P.loop.on && P.loop.end > P.loop.start) return [Math.floor(P.loop.start / 4), Math.ceil(P.loop.end / 4)];
   const cl = P.tracks.filter(t => t.kind === "synth").flatMap(t => t.clips);
@@ -2323,7 +2349,7 @@ function menus() {
     { label: "Länge halbieren", act: () => { c.len = Math.max(P.snap, c.len / 2); save(); renderArr(); renderEditor(); }, en: () => hasClip },
     { label: "Schleife um den Clip", key: { mod: true, key: "l" }, act: () => { P.loop = { on: true, start: c.start, end: c.start + c.len }; $("bLoop").classList.add("on"); save(); renderArr(); }, en: () => hasClip },
     "-",
-    { label: "Tonhöhen würfeln", act: () => { const sc = SCALES[P.scale][1].length, n = sc * 2; for (let i = 0; i < 16; i++) { const r = Math.random(); c.s.pitch[i] = (r < .3 ? 0 : r < .4 ? sc : Math.floor(Math.random() * (n + 1))) / n; } save(); renderArr(); renderEditor(); }, en: () => hasClip && tr.kind === "synth" },
+    { label: "Tonhöhen würfeln", act: () => { HARM.gen = c.id; const sc = SCALES[P.scale][1].length, n = sc * 2; for (let i = 0; i < 16; i++) { const r = Math.random(); c.s.pitch[i] = (r < .3 ? 0 : r < .4 ? sc : Math.floor(Math.random() * (n + 1))) / n; } save(); renderArr(); renderEditor(); }, en: () => hasClip && tr.kind === "synth" },
   ] };
   const tools = { title: "Tools", items: [
     { label: "Start / Stopp", key: { key: " ", label: IS_MAC ? "Leer" : "Leertaste" }, act: () => T.playing ? stop() : play() },
@@ -2402,7 +2428,7 @@ function keysBox() {
   modal("TASTATURKÜRZEL", "<table>" + rows.join("") + "</table>", [["Schließen", null, true]]);
 }
 function aboutBox() {
-  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.5</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
+  modal("ÜBER TRENDY STUDIO", "<p><b>TRENDY STUDIO V1.6</b><br>Produziert von Andreas Engel, Darmstadt, Deutschland.</p><p>Eine DAW mit beliebig vielen Synth-, Drum- und Audiospuren, Step-Sequenzer als Clip-Editor und großem Mischpult. Dies ist die Browser-Fassung zum gemeinsamen Entwickeln; die Desktop-Fassung für macOS und Windows soll später auch eigene Plugins wie die JARRE MACHINE laden.</p>", [["OK", null, true]]);
 }
 
 /* ---- Audiodateien ---- */
@@ -2952,7 +2978,7 @@ function pickPlanetPreset(tr) {
 }
 function pickSeqPreset(tr, c) {
   presetBrowser("SEQUENZER · MUSTER", SEQ_LIB, x => {
-    c.s = JSON.parse(JSON.stringify(x.s)); c.oct = x.oct; c.name = x.name; c.rowB = x.cat.includes("Akkord") || x.cat.includes("Folgen") || x.cat.includes("Skank") ? 4 : c.rowB;
+    HARM.gen = c.id; c.s = JSON.parse(JSON.stringify(x.s)); c.oct = x.oct; c.name = x.name; c.rowB = x.cat.includes("Akkord") || x.cat.includes("Folgen") || x.cat.includes("Skank") ? 4 : c.rowB;
     save(); renderEditor(); refreshClipPreview(tr, c); renderArr();
   }, "Tonhöhen folgen der Projekttonart. Akkord-Muster klingen am besten mit PLANET 8, Bass-Muster mit TRENDY MONO.");
 }
@@ -3290,7 +3316,7 @@ function synthEditor(ed, tr, c, head) {
   const ok = el("button", "", head, "Oktave " + (c.oct > 0 ? "+" : "") + c.oct); ok.title = "Oktave des Clips weiterschalten";
   ok.onclick = () => { c.oct = c.oct >= 2 ? -2 : c.oct + 1; save(); renderEditor(); refreshClipPreview(tr, c); };
   const rnd = el("button", "", head, "Zufall"); rnd.title = "Neue Tonhöhen würfeln";
-  rnd.onclick = () => { const sc = SCALES[P.scale][1].length, n = sc * 2; for (let i = 0; i < 16; i++) { const r = Math.random(); c.s.pitch[i] = (r < .3 ? 0 : r < .4 ? sc : Math.floor(Math.random() * (n + 1))) / n; } save(); renderEditor(); refreshClipPreview(tr, c); };
+  rnd.onclick = () => { HARM.gen = c.id; const sc = SCALES[P.scale][1].length, n = sc * 2; for (let i = 0; i < 16; i++) { const r = Math.random(); c.s.pitch[i] = (r < .3 ? 0 : r < .4 ? sc : Math.floor(Math.random() * (n + 1))) / n; } save(); renderEditor(); refreshClipPreview(tr, c); };
   const pz = el("button", "", head, "Presets"); pz.title = SEQ_LIB.length + " Muster"; pz.onclick = () => pickSeqPreset(tr, c);
   const g = el("div", "seqed", ed);
   el("div", "lab", g, "");
