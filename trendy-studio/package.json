@@ -1,0 +1,31 @@
+{
+  "name": "trendy-studio",
+  "productName": "TRENDY STUDIO",
+  "version": "1.6.0",
+  "description": "TRENDY STUDIO – DAW von Andreas Engel, Darmstadt",
+  "author": "Andreas Engel, Darmstadt",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "mac": "electron-builder --mac dir --universal --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "de.andreasengel.trendystudio",
+    "productName": "TRENDY STUDIO",
+    "copyright": "Andreas Engel, Darmstadt, Deutschland",
+    "files": ["main.js", "app/**"],
+    "mac": {
+      "category": "public.app-category.music",
+      "identity": null,
+      "minimumSystemVersion": "11.0",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "TRENDY STUDIO nimmt über das Mikrofon oder Audio-Interface Audiospuren auf."
+      }
+    }
+  }
+}
